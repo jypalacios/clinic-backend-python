@@ -8,7 +8,7 @@ from app.api.v1 import health
 
 settings = get_settings()
 
-app = FastAPI(title=settings.APP_NAME)
+app = FastAPI(title=settings.PROJECT_NAME, version=settings.APP_VERSION)
 
 app.add_middleware(
     CORSMiddleware,
