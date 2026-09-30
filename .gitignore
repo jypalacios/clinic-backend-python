@@ -1,0 +1,143 @@
+```gitignore
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+wheels/
+
+# ==========================
+# Virtual Environments
+# ==========================
+venv/
+.venv/
+env/
+ENV/
+
+# ==========================
+# Environment Variables
+# ==========================
+.env
+.env.*
+!.env.example
+
+# ==========================
+# IDEs
+# ==========================
+.vscode/
+.idea/
+*.code-workspace
+
+# ==========================
+# Logs
+# ==========================
+*.log
+logs/
+uvicorn.log
+
+# ==========================
+# Pytest
+# ==========================
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ==========================
+# Mypy
+# ==========================
+.mypy_cache/
+
+# ==========================
+# Ruff
+# ==========================
+.ruff_cache/
+
+# ==========================
+# Docker
+# ==========================
+docker-compose.override.yml
+*.pid
+Dockerfile
+docker-compose.yml
+# ==========================
+# PostgreSQL
+# ==========================
+postgres_data/
+pgdata/
+*.sql   
+# ==========================
+# Alembic
+# ==========================
+alembic/versions/*.pyc
+alembic/versions/__pycache__/
+
+# ==========================
+# OS Files
+# ==========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==========================
+# Temporary Files
+# ==========================
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# ==========================
+# AWS
+# ==========================
+.aws/
+.aws-sam/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+
+# ==========================
+# Terraform
+# ==========================
+.terraform/
+.terraform.lock.hcl
+
+# ==========================
+# Secrets
+# ==========================
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+
+# ==========================
+# Jupyter
+# ==========================
+.ipynb_checkpoints/
+```
+# =================
+# Comandos utiles
+# ============
+comandos_utiles.txt
+*.xlsx
+*.csv
+*.txt
+*.pdf
+*.docx
+*.doc
+*.xls
+*.xlsm
+*.xlsb
+*.xlsm
+*.xlsb
+*.xlsm
+config.md
