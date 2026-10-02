@@ -1,0 +1,30 @@
+name: Auto Merge Develop to Main
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  merge-to-main:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Otorga permisos de escritura para realizar la fusión y el push
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Descarga todo el historial de commits necesario para el merge
+
+      - name: Configurar identidad de Git
+        run: |
+          git config user.name "jypalacios"
+          git config user.email "jypalacios@gmail.com"
+
+      - name: Traer rama main y fusionar develop
+        run: |
+          git checkout main
+          git pull origin main
+          git merge origin/develop --no-ff -m "ci(github-actions): auto-merge develop into main"
+          git push origin main
