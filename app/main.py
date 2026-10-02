@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.db.session import engine
-from app.api.v1 import health
+from app.api.v1 import appointments, auth, doctors, health, patients, users
 
 settings = get_settings()
 
@@ -19,11 +19,11 @@ app.add_middleware(
 )
 
 app.include_router(health.router, tags=["health"])
-
-# Aquí se agregan los demás routers a medida que se implementen:
-# from app.api.v1 import auth, users, patients, doctors, appointments, clinical
-# app.include_router(auth.router, prefix=settings.API_V1_PREFIX + "/auth", tags=["auth"])
-# app.include_router(patients.router, prefix=settings.API_V1_PREFIX + "/patients", tags=["patients"])
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["auth"])
+app.include_router(users.router, prefix=settings.API_V1_PREFIX, tags=["users"])
+app.include_router(patients.router, prefix=settings.API_V1_PREFIX, tags=["patients"])
+app.include_router(doctors.router, prefix=settings.API_V1_PREFIX, tags=["doctors"])
+app.include_router(appointments.router, prefix=settings.API_V1_PREFIX, tags=["appointments"])
 
 
 @app.on_event("startup")
