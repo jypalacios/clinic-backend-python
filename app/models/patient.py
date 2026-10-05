@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -15,6 +15,7 @@ class Patient(Base):
     ape_patients: Mapped[str] = mapped_column(String(80), nullable=False)
     fec_nacimiento: Mapped[date] = mapped_column(Date, nullable=False)
     id_sexo: Mapped[int] = mapped_column(ForeignKey("sexo.id_sexo"), nullable=False)
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     telefono: Mapped[str | None] = mapped_column(String(30))
     email: Mapped[str | None] = mapped_column(String(120))
     direccion: Mapped[str | None] = mapped_column(String(255))
@@ -23,4 +24,3 @@ class Patient(Base):
 
     sexo: Mapped["Sexo"] = relationship(back_populates="patients")
     appointments: Mapped[list["Appointment"]] = relationship(back_populates="patient")
-    clinical_records: Mapped[list["ClinicalRecord"]] = relationship(back_populates="patient")

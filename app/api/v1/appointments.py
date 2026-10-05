@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.deps import require_roles
+from app.core.deps import require_permissions
 from app.db.session import get_db
-from app.schemas.appointment_schema import AppointmentCreate, AppointmentOut
+from app.models.user import User
+from app.schemas.appointment_schema import AppointmentCreate, AppointmentOut, AppointmentUpdate
 from app.services.appointment_service import AppointmentService
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/appointments", tags=["appointments"])
 @router.get("/", response_model=list[AppointmentOut])
 def list_appointments(
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("admin", "assistant", "doctor")),
+    _current_user=Depends(require_permissions("appointments.view")),
 ):
     service = AppointmentService(db)
     return service.list_appointments()
@@ -22,11 +23,24 @@ def list_appointments(
 def create_appointment(
     data: AppointmentCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("admin", "assistant")),
+    current_user: User = Depends(require_permissions("appointments.manage")),
 ):
     service = AppointmentService(db)
     try:
-        return service.create_appointment(data)
+        return service.create_appointment(data, current_user)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.put("/{appointment_id}", response_model=AppointmentOut)
+def update_appointment(
+    appointment_id: int,
+    data: AppointmentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permissions("appointments.manage")),
+):
+    try:
+        return AppointmentService(db).update_appointment(appointment_id, data, current_user)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -35,7 +49,7 @@ def create_appointment(
 def get_appointment(
     appointment_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("admin", "assistant", "doctor")),
+    _current_user=Depends(require_permissions("appointments.view")),
 ):
     service = AppointmentService(db)
     appointment = service.get_appointment(appointment_id)

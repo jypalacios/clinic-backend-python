@@ -23,6 +23,7 @@ class PatientOut(BaseModel):
     ape_patients: str
     fec_nacimiento: date
     id_sexo: int
+    activo: bool = True
     telefono: str | None = None
     email: EmailStr | None = None
     direccion: str | None = None

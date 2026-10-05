@@ -3,6 +3,7 @@ from typing import Any
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from passlib.exc import UnknownHashError
 
 from app.core.config import get_settings
 
@@ -12,7 +13,10 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verifica una contraseña en texto plano contra su hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except UnknownHashError:
+        return False
 
 
 def get_password_hash(password: str) -> str:

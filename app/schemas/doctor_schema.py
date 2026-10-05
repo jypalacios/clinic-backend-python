@@ -13,6 +13,8 @@ class DoctorCreate(BaseModel):
 
 class DoctorOut(BaseModel):
     id_doctors: int
+    id_user: int | None = None
+    activo: bool
     ape_doctors: str
     nom_doctors: str
     id_espect: int
@@ -23,3 +25,7 @@ class DoctorOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DoctorUserLink(BaseModel):
+    id_user: int | None
