@@ -116,6 +116,7 @@ clinica_backend/
 - registro de pacientes
 - consulta por identificación
 - relación con citas
+- importación CSV con validación previa, detección de identificaciones duplicadas y transacción todo-o-nada (requiere `patients.manage`)
 
 ### Médicos
 - registro de médicos
@@ -164,6 +165,8 @@ La columna `roles.permisos` y las migraciones de permisos e historias clínicas 
 - `GET /api/v1/roles/` lista los roles para usuarios con permiso de consulta de usuarios o administración de roles.
 - `POST /api/v1/roles/` y `PUT /api/v1/roles/{role_id}` crean roles o editan nombre y permisos.
 - `PUT /api/v1/users/{user_id}/password` cambia una contraseña sin exponerla en el CRUD general.
+- `POST /api/v1/patients/import/preview` valida un CSV multipart y devuelve un resumen, una muestra de filas válidas y errores por fila.
+- `POST /api/v1/patients/import` vuelve a validar el CSV y lo importa en una única transacción; rechaza el archivo completo si alguna fila es inválida.
 - `POST /api/v1/appointments/` crea una cita con estado inicial `PROGRAMADA`.
 - `PUT /api/v1/appointments/{appointment_id}` reprograma la fecha/hora o el médico de una cita programada o confirmada; requiere `appointments.manage`.
 - `GET/POST /api/v1/clinical-records/` consulta y abre historias clínicas.
@@ -179,7 +182,15 @@ La columna `roles.permisos` y las migraciones de permisos e historias clínicas 
 - El rol `MEDICO` recibe permiso de consulta y gestión de historias; `ADMINISTRADOR` recibe archivo lógico y vinculación de cuentas médicas.
 - La primera actualización posterior a esta versión agrega una sola vez `users.view` y `users.create` a `ASISTENTE`, conservando los permisos ya configurados.
 
+### Importación de pacientes por CSV
+- Descargue desde Pacientes la plantilla UTF-8 y use encabezados `cedula,nombres,apellidos,fecha_nacimiento,sexo,telefono,email,direccion,eps,contacto_emergencia`.
+- Son obligatorios `cedula`, `nombres`, `apellidos`, `fecha_nacimiento` (formato `AAAA-MM-DD`) y `sexo`; los demás campos son opcionales. El valor de `sexo` debe coincidir con una opción del catálogo.
+- Se aceptan separadores coma o punto y coma; el tamaño máximo es 5 MB y el archivo admite hasta 5.000 filas de datos.
+- La previsualización valida encabezados, tipos, longitudes, catálogo de sexo e identificaciones duplicadas en el archivo o en la base. Muestra máximo 10 filas válidas y los errores por número de fila.
+- La confirmación vuelve a validar el mismo archivo. No se actualizan pacientes existentes y no se inserta ningún paciente si hay errores. Una falla al guardar revierte toda la carga.
+- El log de auditoría guarda el usuario, la cantidad importada y el origen CSV; no almacena las filas ni datos personales del archivo.
+
 ## Siguientes mejoras propuestas
 
 - implementar paginación y filtros
-- preparar pruebas automáticas
+- ampliar pruebas automáticas
