@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.models.patient import Patient
+from app.models.user import User
 from app.repositories.patient_repository import PatientRepository
 from app.schemas.patient_schema import PatientCreate
 
@@ -28,8 +29,17 @@ class PatientService:
 
         return self.repo.create(patient)
 
-    def list_patients(self) -> list[Patient]:
-        return self.repo.list_all()
+    def list_patients(self, user: User) -> list[Patient]:
+        permissions = set(user.role.permisos if user.role else [])
+        if "patients.view" in permissions:
+            return self.repo.list_all()
+        return self.repo.list_for_doctor(user.id)
 
-    def get_patient(self, patient_id: int) -> Patient | None:
-        return self.repo.get_by_id(patient_id)
+    def get_patient(self, patient_id: int, user: User) -> Patient | None:
+        patient = self.repo.get_by_id(patient_id)
+        if not patient:
+            return None
+        permissions = set(user.role.permisos if user.role else [])
+        if "patients.view" not in permissions and not self.repo.is_assigned_to_doctor(patient_id, user.id):
+            return None
+        return patient
