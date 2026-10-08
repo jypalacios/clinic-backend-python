@@ -11,11 +11,14 @@ class PatientService:
         self.repo = PatientRepository(db)
 
     def create_patient(self, data: PatientCreate) -> Patient:
-        if self.repo.get_by_cedula(data.ced_patients):
-            raise ValueError("La cédula del paciente ya existe")
+        if not self.repo.get_document(data.id_documents):
+            raise ValueError("El tipo de documento seleccionado no existe")
+        if self.repo.get_by_identification(data.id_documents, data.ced_patients):
+            raise ValueError("El número de identificación ya existe para este tipo de documento")
 
         patient = Patient(
             ced_patients=data.ced_patients,
+            id_documents=data.id_documents,
             nom_patients=data.nom_patients,
             ape_patients=data.ape_patients,
             fec_nacimiento=data.fec_nacimiento,
