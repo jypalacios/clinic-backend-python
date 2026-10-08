@@ -9,6 +9,7 @@ from app.db.session import engine
 from app.models.appointment import Appointment
 from app.models.audit_log import AuditLog
 from app.models.clinical_record import ClinicalEntry, ClinicalRecord
+from app.models.document import Document
 from app.models.doctor import Doctor
 from app.models.patient import Patient
 from app.models.role import Role
@@ -16,11 +17,12 @@ from app.models.sexo import Sexo
 from app.models.specialty import Specialty
 from app.models.user import User
 from app.core.permissions import DEFAULT_ROLE_PERMISSIONS
-from app.api.v1 import appointments, auth, clinical_records, doctors, health, patients, roles, sexos, specialties, users
+from app.api.v1 import appointments, auth, clinical_records, doctors, documents, health, patients, roles, sexos, specialties, users
 
 settings = get_settings()
 USER_CREATION_PERMISSION_MIGRATION = "20261005_assistant_user_creation"
 CLINICAL_HISTORY_MIGRATION = "20261005_clinical_history_access"
+PATIENT_DOCUMENTS_MIGRATION = "20261008_patient_documents"
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.APP_VERSION)
 
@@ -37,6 +39,7 @@ app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["auth"])
 app.include_router(users.router, prefix=settings.API_V1_PREFIX, tags=["users"])
 app.include_router(roles.router, prefix=settings.API_V1_PREFIX, tags=["roles"])
 app.include_router(patients.router, prefix=settings.API_V1_PREFIX, tags=["patients"])
+app.include_router(documents.router, prefix=settings.API_V1_PREFIX)
 app.include_router(sexos.router, prefix=settings.API_V1_PREFIX)
 app.include_router(specialties.router, prefix=settings.API_V1_PREFIX)
 app.include_router(doctors.router, prefix=settings.API_V1_PREFIX, tags=["doctors"])
@@ -137,4 +140,70 @@ def verificar_conexion_bd() -> None:
             conn.execute(
                 text("INSERT INTO app_schema_migrations (version) VALUES (:version)"),
                 {"version": CLINICAL_HISTORY_MIGRATION},
+            )
+
+        patient_documents_applied = conn.execute(
+            text("SELECT 1 FROM app_schema_migrations WHERE version = :version"),
+            {"version": PATIENT_DOCUMENTS_MIGRATION},
+        ).first()
+        if not patient_documents_applied:
+            patient_columns = {
+                column["name"] for column in inspect(conn).get_columns("patients")
+            }
+            if "id_documents" not in patient_columns:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN id_documents BIGINT"))
+
+            default_document_id = conn.execute(
+                text("SELECT id_documents FROM v_documents WHERE desc_tipo = 'CC'")
+            ).scalar_one_or_none()
+            if default_document_id is None:
+                raise RuntimeError("El catálogo v_documents no contiene el tipo de documento CC")
+
+            conn.execute(
+                text(
+                    "UPDATE patients SET id_documents = :document_id "
+                    "WHERE id_documents IS NULL"
+                ),
+                {"document_id": default_document_id},
+            )
+            conn.execute(text("ALTER TABLE patients ALTER COLUMN id_documents SET NOT NULL"))
+
+            unique_constraints = inspect(conn).get_unique_constraints("patients")
+            for constraint in unique_constraints:
+                if constraint.get("column_names") == ["ced_patients"]:
+                    quoted_name = conn.dialect.identifier_preparer.quote(constraint["name"])
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE patients DROP CONSTRAINT {quoted_name}"
+                    )
+
+            foreign_keys = inspect(conn).get_foreign_keys("patients")
+            has_document_foreign_key = any(
+                foreign_key.get("constrained_columns") == ["id_documents"]
+                and foreign_key.get("referred_table") == "documents"
+                for foreign_key in foreign_keys
+            )
+            if not has_document_foreign_key:
+                conn.execute(
+                    text(
+                        "ALTER TABLE patients ADD CONSTRAINT fk_patients_documents "
+                        "FOREIGN KEY (id_documents) REFERENCES documents(id_documents)"
+                    )
+                )
+
+            unique_constraints = inspect(conn).get_unique_constraints("patients")
+            has_composite_unique = any(
+                constraint.get("column_names") == ["id_documents", "ced_patients"]
+                for constraint in unique_constraints
+            )
+            if not has_composite_unique:
+                conn.execute(
+                    text(
+                        "ALTER TABLE patients ADD CONSTRAINT uq_patients_document_identification "
+                        "UNIQUE (id_documents, ced_patients)"
+                    )
+                )
+
+            conn.execute(
+                text("INSERT INTO app_schema_migrations (version) VALUES (:version)"),
+                {"version": PATIENT_DOCUMENTS_MIGRATION},
             )

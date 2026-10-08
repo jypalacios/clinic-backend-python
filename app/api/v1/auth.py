@@ -25,6 +25,8 @@ def login(data: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
 def get_me(current_user=Depends(get_current_user)):
     return {
         "id": current_user.id,
+        "nombre": current_user.nombre,
+        "apellido": current_user.apellido,
         "usuario": current_user.usuario,
         "email": current_user.email,
         "role": current_user.role.nom_role if current_user.role else None,

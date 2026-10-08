@@ -2,9 +2,12 @@ from datetime import date
 
 from pydantic import BaseModel, EmailStr, Field
 
+from app.schemas.document_schema import DocumentOut
+
 
 class PatientCreate(BaseModel):
     ced_patients: str = Field(min_length=1, max_length=20)
+    id_documents: int = Field(gt=0)
     nom_patients: str = Field(min_length=1, max_length=100)
     ape_patients: str = Field(min_length=1, max_length=100)
     fec_nacimiento: date
@@ -19,6 +22,8 @@ class PatientCreate(BaseModel):
 class PatientOut(BaseModel):
     id_patients: int
     ced_patients: str
+    id_documents: int
+    document: DocumentOut
     nom_patients: str
     ape_patients: str
     fec_nacimiento: date

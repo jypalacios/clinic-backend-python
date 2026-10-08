@@ -183,12 +183,13 @@ La columna `roles.permisos` y las migraciones de permisos e historias clínicas 
 - La primera actualización posterior a esta versión agrega una sola vez `users.view` y `users.create` a `ASISTENTE`, conservando los permisos ya configurados.
 
 ### Importación de pacientes por CSV
-- Descargue desde Pacientes la plantilla UTF-8 y use encabezados `cedula,nombres,apellidos,fecha_nacimiento,sexo,telefono,email,direccion,eps,contacto_emergencia`.
-- Son obligatorios `cedula`, `nombres`, `apellidos`, `fecha_nacimiento` (formato `AAAA-MM-DD`) y `sexo`; los demás campos son opcionales. El valor de `sexo` debe coincidir con una opción del catálogo.
+- Descargue desde Pacientes la plantilla UTF-8 y use encabezados `tipo_documento,cedula,nombres,apellidos,fecha_nacimiento,sexo,telefono,email,direccion,eps,contacto_emergencia`.
+- Son obligatorios `tipo_documento`, `cedula`, `nombres`, `apellidos`, `fecha_nacimiento` (formato `AAAA-MM-DD`) y `sexo`; los demás campos son opcionales. El tipo de documento acepta el código o el nombre del catálogo (`GET /api/v1/documents/`) y el sexo debe coincidir con una opción de su catálogo.
 - Se aceptan separadores coma o punto y coma; el tamaño máximo es 5 MB y el archivo admite hasta 5.000 filas de datos.
-- La previsualización valida encabezados, tipos, longitudes, catálogo de sexo e identificaciones duplicadas en el archivo o en la base. Muestra máximo 10 filas válidas y los errores por número de fila.
+- La previsualización valida encabezados, tipos, longitudes y ambos catálogos; detecta duplicados por tipo y número de documento tanto en el archivo como en la base. Muestra máximo 10 filas válidas y los errores por número de fila.
 - La confirmación vuelve a validar el mismo archivo. No se actualizan pacientes existentes y no se inserta ningún paciente si hay errores. Una falla al guardar revierte toda la carga.
 - El log de auditoría guarda el usuario, la cantidad importada y el origen CSV; no almacena las filas ni datos personales del archivo.
+- Al actualizar una base existente, los pacientes ya registrados se asignan al tipo de documento CC.
 
 ## Siguientes mejoras propuestas
 

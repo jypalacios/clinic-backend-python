@@ -22,6 +22,7 @@ MAX_CSV_ROWS = 5000
 PREVIEW_ROW_LIMIT = 10
 
 CSV_FIELDS = {
+    "tipo_documento": "id_documents",
     "cedula": "ced_patients",
     "nombres": "nom_patients",
     "apellidos": "ape_patients",
@@ -33,8 +34,9 @@ CSV_FIELDS = {
     "eps": "eps",
     "contacto_emergencia": "contacto_emergencia",
 }
-REQUIRED_HEADERS = {"cedula", "nombres", "apellidos", "fecha_nacimiento", "sexo"}
+REQUIRED_HEADERS = {"tipo_documento", "cedula", "nombres", "apellidos", "fecha_nacimiento", "sexo"}
 FIELD_LABELS = {
+    "id_documents": "Tipo de documento",
     "ced_patients": "Identificación",
     "nom_patients": "Nombres",
     "ape_patients": "Apellidos",
@@ -132,6 +134,12 @@ class PatientCSVImportService:
 
         sexos = self.repo.list_sexos()
         sexos_by_name = {_normalize(sexo.nom_sexo): sexo.id_sexo for sexo in sexos}
+        documents = self.repo.list_documents()
+        documents_by_name = {
+            _normalize(value): document.id_documents
+            for document in documents
+            for value in (document.desc_tipo, document.desc_documents)
+        }
         parsed_rows: list[dict[str, Any]] = []
         data_rows = 0
         for row_number, raw_row in enumerate(reader, start=2):
@@ -157,17 +165,28 @@ class PatientCSVImportService:
                     + ", ".join(sexo.nom_sexo for sexo in sexos)
                 )
 
+            document_name = _normalize(source.get("tipo_documento", ""))
+            document_id = documents_by_name.get(document_name)
+            if document_id is None:
+                messages.append(
+                    "Tipo de documento no reconocido; use uno de los valores del catálogo: "
+                    + ", ".join(document.desc_tipo for document in documents)
+                )
+
             patient_data = {
                 CSV_FIELDS[header]: source.get(header) or None
                 for header in CSV_FIELDS
-                if header != "sexo"
+                if header not in {"sexo", "tipo_documento"}
             }
+            patient_data["id_documents"] = document_id
             patient_data["id_sexo"] = sex_id if sex_id is not None else 1
             try:
                 patient = PatientCreate.model_validate(patient_data)
             except ValidationError as exc:
                 for error in exc.errors():
                     field = str(error["loc"][0])
+                    if field == "id_documents" and document_id is None:
+                        continue
                     label = FIELD_LABELS.get(field, field)
                     message = "es obligatorio" if error["type"] == "missing" else str(error["msg"])
                     messages.append(f"{label}: {message}")
@@ -175,7 +194,11 @@ class PatientCSVImportService:
             parsed_rows.append({
                 "row_number": row_number,
                 "patient": patient,
-                "identification": source.get("cedula", ""),
+                "identification": (
+                    (document_id, source.get("cedula", ""))
+                    if document_id is not None
+                    else None
+                ),
                 "messages": messages,
             })
 
@@ -191,8 +214,8 @@ class PatientCSVImportService:
         for row in rows_with_identification:
             identification = row["identification"]
             if identification in duplicate_ids:
-                row["messages"].append("La identificación está repetida dentro del archivo")
+                row["messages"].append("La identificación (tipo y número) está repetida dentro del archivo")
             if identification in existing_ids:
-                row["messages"].append("La identificación ya está registrada")
+                row["messages"].append("La identificación (tipo y número) ya está registrada")
 
         return parsed_rows
