@@ -32,6 +32,29 @@ class PatientService:
 
         return self.repo.create(patient)
 
+    def update_patient(self, patient_id: int, data: PatientCreate) -> Patient | None:
+        patient = self.repo.get_by_id(patient_id)
+        if not patient:
+            return None
+        if not self.repo.get_document(data.id_documents):
+            raise ValueError("El tipo de documento seleccionado no existe")
+        existing_patient = self.repo.get_by_identification(data.id_documents, data.ced_patients)
+        if existing_patient and existing_patient.id_patients != patient_id:
+            raise ValueError("El número de identificación ya existe para este tipo de documento")
+
+        patient.ced_patients = data.ced_patients
+        patient.id_documents = data.id_documents
+        patient.nom_patients = data.nom_patients
+        patient.ape_patients = data.ape_patients
+        patient.fec_nacimiento = data.fec_nacimiento
+        patient.id_sexo = data.id_sexo
+        patient.telefono = data.telefono
+        patient.email = data.email
+        patient.direccion = data.direccion
+        patient.eps = data.eps
+        patient.contacto_emergencia = data.contacto_emergencia
+        return self.repo.update(patient)
+
     def list_patients(self, user: User) -> list[Patient]:
         permissions = set(user.role.permisos if user.role else [])
         if "patients.view" in permissions:

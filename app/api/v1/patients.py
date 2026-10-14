@@ -41,6 +41,23 @@ def create_patient(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.put("/{patient_id}", response_model=PatientOut)
+def update_patient(
+    patient_id: int,
+    data: PatientCreate,
+    db: Session = Depends(get_db),
+    _current_user=Depends(require_permissions("patients.manage")),
+):
+    service = PatientService(db)
+    try:
+        patient = service.update_patient(patient_id, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado")
+    return patient
+
+
 @router.post("/import/preview", response_model=PatientCSVPreview)
 async def preview_patient_import(
     file: UploadFile = File(...),

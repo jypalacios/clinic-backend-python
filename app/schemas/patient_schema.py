@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.schemas.document_schema import DocumentOut
 
@@ -27,13 +27,24 @@ class PatientOut(BaseModel):
     nom_patients: str
     ape_patients: str
     fec_nacimiento: date
+    edad: int
     id_sexo: int
-    activo: bool = True
+    nom_sexo: str
+    activo: int = 0
     telefono: str | None = None
     email: EmailStr | None = None
     direccion: str | None = None
     eps: str | None = None
     contacto_emergencia: str | None = None
+
+    @field_validator("activo", mode="before")
+    @classmethod
+    def normalize_activo(cls, value: object) -> int:
+        if isinstance(value, bool):
+            return 0 if value else 1
+        if value in (0, 1):
+            return int(value)
+        raise ValueError("activo debe ser 0 (activo) o 1 (inactivo)")
 
     class Config:
         from_attributes = True

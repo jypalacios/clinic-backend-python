@@ -23,6 +23,7 @@ settings = get_settings()
 USER_CREATION_PERMISSION_MIGRATION = "20261005_assistant_user_creation"
 CLINICAL_HISTORY_MIGRATION = "20261005_clinical_history_access"
 PATIENT_DOCUMENTS_MIGRATION = "20261008_patient_documents"
+PATIENT_AGE_MIGRATION = "20261009_patient_age"
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.APP_VERSION)
 
@@ -206,4 +207,34 @@ def verificar_conexion_bd() -> None:
             conn.execute(
                 text("INSERT INTO app_schema_migrations (version) VALUES (:version)"),
                 {"version": PATIENT_DOCUMENTS_MIGRATION},
+            )
+
+        patient_age_applied = conn.execute(
+            text("SELECT 1 FROM app_schema_migrations WHERE version = :version"),
+            {"version": PATIENT_AGE_MIGRATION},
+        ).first()
+        if not patient_age_applied:
+            patient_columns = {
+                column["name"] for column in inspect(conn).get_columns("patients")
+            }
+            if "edad" not in patient_columns:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN edad INTEGER"))
+
+            conn.execute(
+                text(
+                    "UPDATE patients "
+                    "SET edad = EXTRACT( "
+                    "YEAR FROM age((CURRENT_TIMESTAMP AT TIME ZONE 'America/Bogota')::DATE, "
+                    "fec_nacimiento) "
+                    ")::INTEGER "
+                    "WHERE edad IS DISTINCT FROM EXTRACT( "
+                    "YEAR FROM age((CURRENT_TIMESTAMP AT TIME ZONE 'America/Bogota')::DATE, "
+                    "fec_nacimiento) "
+                    ")::INTEGER"
+                )
+            )
+            conn.execute(text("ALTER TABLE patients ALTER COLUMN edad SET NOT NULL"))
+            conn.execute(
+                text("INSERT INTO app_schema_migrations (version) VALUES (:version)"),
+                {"version": PATIENT_AGE_MIGRATION},
             )
