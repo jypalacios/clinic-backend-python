@@ -91,11 +91,18 @@ clinica_backend/
 ├── 02_procedimientos.sql
 ├── 03_vistas.sql
 ├── 05_historias_clinicas.sql
+├── 06_triggers.sql
 ├── docker-compose.yml
 ├── Dockerfile
 ├── requirements.txt
 ├── config.md
 └── README.md
+
+`06_triggers.sql` agrega y mantiene la edad de los pacientes, y programa su
+recalculo diario a la 01:00 con `pg_cron`. Antes de ejecutarlo, PostgreSQL debe
+tener la extensión instalada, `pg_cron` habilitado en `shared_preload_libraries`,
+`cron.database_name` configurado con la base de datos de la clínica y
+`cron.timezone` configurado como `America/Bogota`.
 
 ## Principales módulos de negocio
 

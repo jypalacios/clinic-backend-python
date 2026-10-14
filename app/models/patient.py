@@ -28,6 +28,7 @@ class Patient(Base):
     nom_patients: Mapped[str] = mapped_column(String(100), nullable=False)
     ape_patients: Mapped[str] = mapped_column(String(100), nullable=False)
     fec_nacimiento: Mapped[date] = mapped_column(Date, nullable=False)
+    edad: Mapped[int] = mapped_column(Integer, nullable=False)
     id_sexo: Mapped[int] = mapped_column(ForeignKey("sexo.id_sexo"), nullable=False)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     telefono: Mapped[str | None] = mapped_column(String(20))
