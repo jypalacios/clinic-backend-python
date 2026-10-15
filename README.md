@@ -166,11 +166,15 @@ El proyecto ya cuenta con:
 - seguridad JWT y autorización por permisos, aplicada a las rutas de frontend y endpoints
 - configuración Alembic
 
-La columna `roles.permisos` y las migraciones de permisos e historias clínicas se aplican automáticamente al iniciar la aplicación en bases existentes. Los scripts `04_permisos_roles.sql` y `05_historias_clinicas.sql` contienen las migraciones manuales equivalentes.
+La matriz activa `matriz_permisos` junto con `permisos.activo` es la fuente de autorización. En bases existentes, el backend migra una sola vez los permisos JSON heredados de `roles.permisos` a la matriz y actualiza `v_permisos` y `v_permisos_roles`. Los scripts `04_permisos_roles.sql` y `05_historias_clinicas.sql` contienen las migraciones manuales equivalentes.
+Para instalar o actualizar los procedimientos almacenados, ejecute `02_procedimientos.sql`; incluye el nombre singular `sp_insertar_matriz_permiso` y conserva el alias plural existente.
 
 ### Administración de acceso
 - `GET /api/v1/roles/` lista los roles para usuarios con permiso de consulta de usuarios o administración de roles.
-- `POST /api/v1/roles/` y `PUT /api/v1/roles/{role_id}` crean roles o editan nombre y permisos.
+- `GET /api/v1/roles/permissions` lista el catálogo y estado de los permisos.
+- `POST /api/v1/roles/` y `PUT /api/v1/roles/{role_id}` crean roles o editan su nombre y asignaciones.
+- `POST /api/v1/roles/permissions` y `PUT /api/v1/roles/permissions/{permission_id}` crean, renombran o desactivan permisos.
+- Las escrituras llaman `sp_insertar_role`, `sp_actualizar_role`, `sp_insertar_permiso`, `sp_actualizar_permiso`, `sp_insertar_matriz_permiso` y `sp_actualizar_matriz_permisos`.
 - `PUT /api/v1/users/{user_id}/password` cambia una contraseña sin exponerla en el CRUD general.
 - `POST /api/v1/patients/import/preview` valida un CSV multipart y devuelve un resumen, una muestra de filas válidas y errores por fila.
 - `POST /api/v1/patients/import` vuelve a validar el CSV y lo importa en una única transacción; rechaza el archivo completo si alguna fila es inválida.

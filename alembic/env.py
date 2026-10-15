@@ -13,6 +13,7 @@ from app.db.base import Base
 from app.models.appointment import Appointment
 from app.models.doctor import Doctor
 from app.models.patient import Patient
+from app.models.permission import Permission, RolePermission
 from app.models.role import Role
 from app.models.sexo import Sexo
 from app.models.specialty import Specialty

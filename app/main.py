@@ -5,6 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
 from app.core.config import get_settings
+from app.core.permissions import (
+    CANONICAL_PERMISSION_NAMES,
+    DEFAULT_ROLE_PERMISSIONS,
+    permission_key_for_name,
+)
 from app.db.session import engine
 from app.models.appointment import Appointment
 from app.models.audit_log import AuditLog
@@ -12,11 +17,11 @@ from app.models.clinical_record import ClinicalEntry, ClinicalRecord
 from app.models.document import Document
 from app.models.doctor import Doctor
 from app.models.patient import Patient
+from app.models.permission import Permission, RolePermission
 from app.models.role import Role
 from app.models.sexo import Sexo
 from app.models.specialty import Specialty
 from app.models.user import User
-from app.core.permissions import DEFAULT_ROLE_PERMISSIONS
 from app.api.v1 import appointments, auth, clinical_records, doctors, documents, health, patients, roles, sexos, specialties, users
 
 settings = get_settings()
@@ -24,6 +29,7 @@ USER_CREATION_PERMISSION_MIGRATION = "20261005_assistant_user_creation"
 CLINICAL_HISTORY_MIGRATION = "20261005_clinical_history_access"
 PATIENT_DOCUMENTS_MIGRATION = "20261008_patient_documents"
 PATIENT_AGE_MIGRATION = "20261009_patient_age"
+ROLE_PERMISSION_MATRIX_MIGRATION = "20261014_role_permission_matrix"
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.APP_VERSION)
 
@@ -99,6 +105,57 @@ def verificar_conexion_bd() -> None:
                 {"version": USER_CREATION_PERMISSION_MIGRATION},
             )
 
+        permission_columns = {
+            column["name"] for column in inspect(conn).get_columns("permisos")
+        }
+        if "activo" not in permission_columns:
+            conn.execute(
+                text("ALTER TABLE permisos ADD COLUMN activo BOOLEAN NOT NULL DEFAULT TRUE")
+            )
+        else:
+            conn.execute(text("UPDATE permisos SET activo = TRUE WHERE activo IS NULL"))
+            conn.execute(
+                text(
+                    "ALTER TABLE permisos ALTER COLUMN activo SET DEFAULT TRUE, "
+                    "ALTER COLUMN activo SET NOT NULL"
+                )
+            )
+
+        matrix_columns = {
+            column["name"] for column in inspect(conn).get_columns("matriz_permisos")
+        }
+        if "activo" not in matrix_columns:
+            conn.execute(
+                text("ALTER TABLE matriz_permisos ADD COLUMN activo BOOLEAN NOT NULL DEFAULT TRUE")
+            )
+        else:
+            conn.execute(
+                text("UPDATE matriz_permisos SET activo = TRUE WHERE activo IS NULL")
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE matriz_permisos ALTER COLUMN activo SET DEFAULT TRUE, "
+                    "ALTER COLUMN activo SET NOT NULL"
+                )
+            )
+
+        conn.execute(
+            text(
+                "CREATE OR REPLACE VIEW v_permisos AS "
+                "SELECT id_permiso, nom_permiso, activo FROM permisos"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE OR REPLACE VIEW v_permisos_roles AS "
+                "SELECT mp.id_permiso, p.nom_permiso, mp.id_role, r.nom_role, "
+                "mp.activo, p.activo AS permiso_activo "
+                "FROM matriz_permisos mp "
+                "JOIN permisos p ON p.id_permiso = mp.id_permiso "
+                "JOIN roles r ON r.id_role = mp.id_role"
+            )
+        )
+
         clinical_columns = {
             column["name"] for column in inspect(conn).get_columns("clinical_records")
         }
@@ -141,6 +198,72 @@ def verificar_conexion_bd() -> None:
             conn.execute(
                 text("INSERT INTO app_schema_migrations (version) VALUES (:version)"),
                 {"version": CLINICAL_HISTORY_MIGRATION},
+            )
+
+        role_permission_matrix_applied = conn.execute(
+            text("SELECT 1 FROM app_schema_migrations WHERE version = :version"),
+            {"version": ROLE_PERMISSION_MATRIX_MIGRATION},
+        ).first()
+        if not role_permission_matrix_applied:
+            role_columns = {
+                column["name"] for column in inspect(conn).get_columns("roles")
+            }
+            if "permisos" in role_columns:
+                role_permissions = conn.execute(
+                    text("SELECT id_role, permisos FROM roles")
+                ).mappings()
+                stored_permissions = conn.execute(
+                    text("SELECT id_permiso, nom_permiso, activo FROM permisos")
+                ).mappings().all()
+                for role in role_permissions:
+                    for permission_name in role["permisos"] or []:
+                        permission_key = permission_key_for_name(permission_name)
+                        if permission_key is None:
+                            continue
+                        matching_permissions = [
+                            permission["id_permiso"]
+                            for permission in stored_permissions
+                            if permission["activo"]
+                            and permission_key_for_name(permission["nom_permiso"])
+                            == permission_key
+                        ]
+                        if not matching_permissions:
+                            permission_name = CANONICAL_PERMISSION_NAMES.get(
+                                permission_key, permission_key
+                            )
+                            permission_id = conn.execute(
+                                text(
+                                    "INSERT INTO permisos (nom_permiso) VALUES (:name) "
+                                    "ON CONFLICT (nom_permiso) DO UPDATE "
+                                    "SET nom_permiso = EXCLUDED.nom_permiso "
+                                    "RETURNING id_permiso"
+                                ),
+                                {"name": permission_name},
+                            ).scalar_one()
+                            matching_permissions = [permission_id]
+                            stored_permissions = [
+                                *stored_permissions,
+                                {
+                                    "id_permiso": permission_id,
+                                    "nom_permiso": permission_name,
+                                    "activo": True,
+                                },
+                            ]
+                        for permission_id in matching_permissions:
+                            conn.execute(
+                                text(
+                                    "INSERT INTO matriz_permisos (id_role, id_permiso) "
+                                    "VALUES (:role_id, :permission_id) "
+                                    "ON CONFLICT (id_role, id_permiso) DO NOTHING"
+                                ),
+                                {
+                                    "role_id": role["id_role"],
+                                    "permission_id": permission_id,
+                                },
+                            )
+            conn.execute(
+                text("INSERT INTO app_schema_migrations (version) VALUES (:version)"),
+                {"version": ROLE_PERMISSION_MATRIX_MIGRATION},
             )
 
         patient_documents_applied = conn.execute(
