@@ -12,6 +12,8 @@ Permission = Literal[
     "specialties.manage",
     "patients.view",
     "patients.manage",
+    "patients.edit",
+    "patients.delete",
     "appointments.view",
     "appointments.manage",
     "audit.view",
@@ -21,56 +23,14 @@ Permission = Literal[
     "medical_history.delete",
 ]
 
-ALL_PERMISSIONS: tuple[str, ...] = (
-    "users.view",
-    "users.create",
-    "users.manage",
-    "roles.manage",
-    "doctors.view",
-    "doctors.manage",
-    "doctors.link_user",
-    "specialties.view",
-    "specialties.manage",
-    "patients.view",
-    "patients.manage",
-    "appointments.view",
-    "appointments.manage",
-    "audit.view",
-    "my_patients.view",
-    "medical_history.view",
-    "medical_history.manage",
-    "medical_history.delete",
-)
-
-DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
-    "ADMINISTRADOR": list(ALL_PERMISSIONS),
-    "ASISTENTE": [
-        "users.view",
-        "users.create",
-        "doctors.view",
-        "doctors.manage",
-        "specialties.view",
-        "specialties.manage",
-        "patients.view",
-        "patients.manage",
-        "appointments.view",
-        "appointments.manage",
-    ],
-    "MEDICO": [
-        "my_patients.view",
-        "medical_history.view",
-        "medical_history.manage",
-    ],
-}
-
 LEGACY_PERMISSION_KEYS: dict[str, str] = {
     "CREACION_USUARIOS": "users.create",
     "EDICION_USUARIOS": "users.manage",
     "ELIMINACION_USUARIOS": "users.manage",
     "VISUALIZACION_USUARIOS": "users.view",
     "CREACION_PACIENTES": "patients.manage",
-    "EDICION_PACIENTES": "patients.manage",
-    "ELIMINACION_PACIENTES": "patients.manage",
+    "EDICION_PACIENTES": "patients.edit",
+    "ELIMINACION_PACIENTES": "patients.delete",
     "VISUALIZACION_PACIENTES": "patients.view",
     "CREACION_DOCTORES": "doctors.manage",
     "EDICION_DOCTORES": "doctors.manage",
@@ -92,28 +52,24 @@ LEGACY_PERMISSION_KEYS: dict[str, str] = {
     "EDICION_ROLES": "roles.manage",
     "ELIMINACION_ROLES": "roles.manage",
     "VISUALIZACION_ROLES": "roles.manage",
+    "VISUALIZACION_ESTADOS": "states.view",
+    "CREACION_ESTADOS": "states.manage",
+    "EDICION_ESTADOS": "states.manage",
+    "ELIMINACION_ESTADOS": "states.manage",
+    "VISUALIZACION_DOCUMENTOS": "documents.view",
+    "CREACION_DOCUMENTOS": "documents.manage",
+    "EDICION_DOCUMENTOS": "documents.manage",
+    "ELIMINACION_DOCUMENTOS": "documents.manage",
+    "VISUALIZACION_ESPECIALISTA": "specialties.view",
+    "VISUALIZACION_ESPECIALISTAS": "specialties.view",
+    "CREACION_ESPEIALISTA": "specialties.manage",
+    "CREACION_ESPECIALISTA": "specialties.manage",
+    "CREACION_ESPECIALISTAS": "specialties.manage",
+    "EDICION_ESPECIALISTA": "specialties.manage",
+    "EDICION_ESPECIALISTAS": "specialties.manage",
+    "ELIMINACION_ESPECIALISTA": "specialties.manage",
+    "ELIMINACION_ESPECIALISTAS": "specialties.manage",
 }
-
-CANONICAL_PERMISSION_NAMES: dict[str, str] = {
-    "users.view": "VISUALIZACION_USUARIOS",
-    "users.create": "CREACION_USUARIOS",
-    "users.manage": "EDICION_USUARIOS",
-    "roles.manage": "CREACION_ROLES",
-    "doctors.view": "VISUALIZACION_DOCTORES",
-    "doctors.manage": "EDICION_DOCTORES",
-    "specialties.view": "specialties.view",
-    "specialties.manage": "specialties.manage",
-    "patients.view": "VISUALIZACION_PACIENTES",
-    "patients.manage": "EDICION_PACIENTES",
-    "appointments.view": "VISUALIZACION_CITAS",
-    "appointments.manage": "EDICION_CITAS",
-    "audit.view": "audit.view",
-    "my_patients.view": "my_patients.view",
-    "medical_history.view": "VISUALIZACION_HISTORIAS",
-    "medical_history.manage": "EDICION_HISTORIAS",
-    "medical_history.delete": "ELIMINACION_HISTORIAS",
-}
-
 
 def permission_key_for_name(name: str) -> str | None:
     """Translate persisted legacy permission names to API authorization keys."""

@@ -166,7 +166,7 @@ El proyecto ya cuenta con:
 - seguridad JWT y autorización por permisos, aplicada a las rutas de frontend y endpoints
 - configuración Alembic
 
-La matriz activa `matriz_permisos` junto con `permisos.activo` es la fuente de autorización. En bases existentes, el backend migra una sola vez los permisos JSON heredados de `roles.permisos` a la matriz y actualiza `v_permisos` y `v_permisos_roles`. Los scripts `04_permisos_roles.sql` y `05_historias_clinicas.sql` contienen las migraciones manuales equivalentes.
+La matriz activa `matriz_permisos` junto con `permisos.activo`, expuesta por `v_permisos_roles`, es la fuente única de autorización. La pantalla Roles y permisos lee y modifica estas asignaciones; cualquier permiso faltante se agrega manualmente desde la aplicación. La columna heredada `roles.permisos` puede permanecer en bases existentes, pero no se consulta ni se migra a la matriz. Los scripts `04_permisos_roles.sql` y `05_historias_clinicas.sql` contienen los cambios manuales de esquema y catálogo.
 Para instalar o actualizar los procedimientos almacenados, ejecute `02_procedimientos.sql`; incluye el nombre singular `sp_insertar_matriz_permiso` y conserva el alias plural existente.
 
 ### Administración de acceso

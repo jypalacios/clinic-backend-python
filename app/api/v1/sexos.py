@@ -13,7 +13,13 @@ router = APIRouter(prefix="/sexos", tags=["sexos"])
 def list_sexos(
     db: Session = Depends(get_db),
     _current_user=Depends(
-        require_any_permission("patients.view", "doctors.view", "patients.manage", "doctors.manage")
+        require_any_permission(
+            "patients.view",
+            "doctors.view",
+            "patients.manage",
+            "patients.edit",
+            "doctors.manage",
+        )
     ),
 ) -> list[Sexo]:
     return db.query(Sexo).order_by(Sexo.id_sexo).all()

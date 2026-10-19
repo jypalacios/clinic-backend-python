@@ -46,7 +46,7 @@ def update_patient(
     patient_id: int,
     data: PatientCreate,
     db: Session = Depends(get_db),
-    _current_user=Depends(require_permissions("patients.manage")),
+    _current_user=Depends(require_permissions("patients.edit")),
 ):
     service = PatientService(db)
     try:

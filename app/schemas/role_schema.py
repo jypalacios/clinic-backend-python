@@ -32,4 +32,6 @@ class PermissionOut(BaseModel):
     id_permiso: int
     nom_permiso: str
     permiso_key: str | None
+    etiqueta: str
+    nom_grupo: str
     activo: bool

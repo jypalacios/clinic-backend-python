@@ -1,15 +1,8 @@
-import json
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
 from app.core.config import get_settings
-from app.core.permissions import (
-    CANONICAL_PERMISSION_NAMES,
-    DEFAULT_ROLE_PERMISSIONS,
-    permission_key_for_name,
-)
 from app.db.session import engine
 from app.models.appointment import Appointment
 from app.models.audit_log import AuditLog
@@ -25,11 +18,8 @@ from app.models.user import User
 from app.api.v1 import appointments, auth, clinical_records, doctors, documents, health, patients, roles, sexos, specialties, users
 
 settings = get_settings()
-USER_CREATION_PERMISSION_MIGRATION = "20261005_assistant_user_creation"
-CLINICAL_HISTORY_MIGRATION = "20261005_clinical_history_access"
 PATIENT_DOCUMENTS_MIGRATION = "20261008_patient_documents"
 PATIENT_AGE_MIGRATION = "20261009_patient_age"
-ROLE_PERMISSION_MATRIX_MIGRATION = "20261014_role_permission_matrix"
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.APP_VERSION)
 
@@ -59,19 +49,6 @@ def verificar_conexion_bd() -> None:
     """Falla rápido si la BD no está disponible al iniciar el contenedor."""
     with engine.begin() as conn:
         conn.execute(text("SELECT 1"))
-        role_columns = {column["name"] for column in inspect(conn).get_columns("roles")}
-        if "permisos" not in role_columns:
-            conn.execute(
-                text("ALTER TABLE roles ADD COLUMN permisos JSONB NOT NULL DEFAULT '[]'::jsonb")
-            )
-            for role_name, permissions in DEFAULT_ROLE_PERMISSIONS.items():
-                conn.execute(
-                    text(
-                        "UPDATE roles SET permisos = CAST(:permissions AS JSONB) "
-                        "WHERE upper(trim(nom_role)) = :role_name"
-                    ),
-                    {"permissions": json.dumps(permissions), "role_name": role_name},
-                )
 
         conn.execute(
             text(
@@ -79,31 +56,6 @@ def verificar_conexion_bd() -> None:
                 "(version VARCHAR(100) PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"
             )
         )
-        migration_applied = conn.execute(
-            text("SELECT 1 FROM app_schema_migrations WHERE version = :version"),
-            {"version": USER_CREATION_PERMISSION_MIGRATION},
-        ).first()
-        if not migration_applied:
-            assistant_roles = conn.execute(
-                text(
-                    "SELECT id_role, permisos FROM roles "
-                    "WHERE upper(trim(nom_role)) = 'ASISTENTE' FOR UPDATE"
-                )
-            ).mappings()
-            for assistant in assistant_roles:
-                permissions = set(assistant["permisos"] or [])
-                permissions.update(("users.view", "users.create"))
-                conn.execute(
-                    text("UPDATE roles SET permisos = CAST(:permissions AS JSONB) WHERE id_role = :role_id"),
-                    {
-                        "permissions": json.dumps(sorted(permissions)),
-                        "role_id": assistant["id_role"],
-                    },
-                )
-            conn.execute(
-                text("INSERT INTO app_schema_migrations (version) VALUES (:version)"),
-                {"version": USER_CREATION_PERMISSION_MIGRATION},
-            )
 
         permission_columns = {
             column["name"] for column in inspect(conn).get_columns("permisos")
@@ -139,10 +91,103 @@ def verificar_conexion_bd() -> None:
                 )
             )
 
+        conn.execute(text("DROP VIEW IF EXISTS v_permisos"))
         conn.execute(
             text(
-                "CREATE OR REPLACE VIEW v_permisos AS "
-                "SELECT id_permiso, nom_permiso, activo FROM permisos"
+                "CREATE VIEW v_permisos AS "
+                "WITH normalized_permissions AS ("
+                "SELECT p.id_permiso, p.nom_permiso, p.usu_creacion, p.fec_creacion, "
+                "p.usu_actualizacion, p.fec_actualizacion, p.activo, "
+                "CASE upper(trim(p.nom_permiso)) "
+                "WHEN 'VISUALIZACION_USUARIOS' THEN 'users.view' "
+                "WHEN 'CREACION_USUARIOS' THEN 'users.create' "
+                "WHEN 'EDICION_USUARIOS' THEN 'users.manage' "
+                "WHEN 'ELIMINACION_USUARIOS' THEN 'users.manage' "
+                "WHEN 'VISUALIZACION_ROLES' THEN 'roles.manage' "
+                "WHEN 'CREACION_ROLES' THEN 'roles.manage' "
+                "WHEN 'EDICION_ROLES' THEN 'roles.manage' "
+                "WHEN 'ELIMINACION_ROLES' THEN 'roles.manage' "
+                "WHEN 'VISUALIZACION_PERMISOS' THEN 'roles.manage' "
+                "WHEN 'CREACION_PERMISOS' THEN 'roles.manage' "
+                "WHEN 'EDICION_PERMISOS' THEN 'roles.manage' "
+                "WHEN 'ELIMINACION_PERMISOS' THEN 'roles.manage' "
+                "WHEN 'VISUALIZACION_DOCTORES' THEN 'doctors.view' "
+                "WHEN 'CREACION_DOCTORES' THEN 'doctors.manage' "
+                "WHEN 'EDICION_DOCTORES' THEN 'doctors.manage' "
+                "WHEN 'ELIMINACION_DOCTORES' THEN 'doctors.manage' "
+                "WHEN 'VISUALIZACION_PACIENTES' THEN 'patients.view' "
+                "WHEN 'CREACION_PACIENTES' THEN 'patients.manage' "
+                "WHEN 'EDICION_PACIENTES' THEN 'patients.edit' "
+                "WHEN 'ELIMINACION_PACIENTES' THEN 'patients.delete' "
+                "WHEN 'VISUALIZACION_CITAS' THEN 'appointments.view' "
+                "WHEN 'CREACION_CITAS' THEN 'appointments.manage' "
+                "WHEN 'EDICION_CITAS' THEN 'appointments.manage' "
+                "WHEN 'ELIMINACION_CITAS' THEN 'appointments.manage' "
+                "WHEN 'VISUALIZACION_HISTORIAS' THEN 'medical_history.view' "
+                "WHEN 'CREACION_HISTORIAS' THEN 'medical_history.manage' "
+                "WHEN 'EDICION_HISTORIAS' THEN 'medical_history.manage' "
+                "WHEN 'ELIMINACION_HISTORIAS' THEN 'medical_history.delete' "
+                "WHEN 'VISUALIZACION_ESTADOS' THEN 'states.view' "
+                "WHEN 'CREACION_ESTADOS' THEN 'states.manage' "
+                "WHEN 'EDICION_ESTADOS' THEN 'states.manage' "
+                "WHEN 'ELIMINACION_ESTADOS' THEN 'states.manage' "
+                "WHEN 'VISUALIZACION_DOCUMENTOS' THEN 'documents.view' "
+                "WHEN 'CREACION_DOCUMENTOS' THEN 'documents.manage' "
+                "WHEN 'EDICION_DOCUMENTOS' THEN 'documents.manage' "
+                "WHEN 'ELIMINACION_DOCUMENTOS' THEN 'documents.manage' "
+                "WHEN 'VISUALIZACION_ESPECIALISTA' THEN 'specialties.view' "
+                "WHEN 'VISUALIZACION_ESPECIALISTAS' THEN 'specialties.view' "
+                "WHEN 'CREACION_ESPEIALISTA' THEN 'specialties.manage' "
+                "WHEN 'CREACION_ESPECIALISTA' THEN 'specialties.manage' "
+                "WHEN 'CREACION_ESPECIALISTAS' THEN 'specialties.manage' "
+                "WHEN 'EDICION_ESPECIALISTA' THEN 'specialties.manage' "
+                "WHEN 'EDICION_ESPECIALISTAS' THEN 'specialties.manage' "
+                "WHEN 'ELIMINACION_ESPECIALISTA' THEN 'specialties.manage' "
+                "WHEN 'ELIMINACION_ESPECIALISTAS' THEN 'specialties.manage' "
+                "ELSE CASE WHEN position('.' IN lower(trim(p.nom_permiso))) > 0 "
+                "THEN lower(trim(p.nom_permiso)) ELSE NULL END END AS permiso_key "
+                "FROM permisos p) "
+                "SELECT id_permiso, nom_permiso, usu_creacion, fec_creacion, "
+                "usu_actualizacion, fec_actualizacion, activo, permiso_key, "
+                "CASE permiso_key "
+                "WHEN 'users.view' THEN 'Consultar usuarios' "
+                "WHEN 'users.create' THEN 'Registrar usuarios' "
+                "WHEN 'users.manage' THEN 'Crear y editar usuarios, estados y contraseñas' "
+                "WHEN 'roles.manage' THEN 'Crear roles y asignar permisos' "
+                "WHEN 'doctors.view' THEN 'Consultar profesionales' "
+                "WHEN 'doctors.manage' THEN 'Registrar profesionales' "
+                "WHEN 'doctors.link_user' THEN 'Vincular cuenta de acceso al profesional' "
+                "WHEN 'specialties.view' THEN 'Consultar especialidades' "
+                "WHEN 'specialties.manage' THEN 'Crear y editar especialidades' "
+                "WHEN 'patients.view' THEN 'Consultar pacientes' "
+                "WHEN 'patients.manage' THEN 'Registrar pacientes' "
+                "WHEN 'patients.edit' THEN 'Editar pacientes' "
+                "WHEN 'patients.delete' THEN 'Eliminar pacientes' "
+                "WHEN 'appointments.view' THEN 'Consultar citas' "
+                "WHEN 'appointments.manage' THEN 'Crear y reprogramar citas' "
+                "WHEN 'audit.view' THEN 'Consultar auditoría' "
+                "WHEN 'my_patients.view' THEN 'Consultar mis pacientes' "
+                "WHEN 'medical_history.view' THEN 'Consultar historia clínica' "
+                "WHEN 'medical_history.manage' THEN 'Crear historias y registrar/rectificar notas' "
+                "WHEN 'medical_history.delete' THEN 'Archivar historias clínicas conservando las notas' "
+                "WHEN 'states.view' THEN 'Consultar estados' "
+                "WHEN 'states.manage' THEN 'Gestionar estados' "
+                "WHEN 'documents.view' THEN 'Consultar documentos' "
+                "WHEN 'documents.manage' THEN 'Gestionar documentos' "
+                "ELSE nom_permiso END AS etiqueta, "
+                "CASE WHEN permiso_key LIKE 'users.%' THEN 'Usuarios' "
+                "WHEN permiso_key = 'roles.manage' THEN 'Roles y permisos' "
+                "WHEN permiso_key IN ('doctors.view','doctors.manage','doctors.link_user') THEN 'Profesionales' "
+                "WHEN permiso_key LIKE 'specialties.%' THEN 'Especialidades' "
+                "WHEN permiso_key LIKE 'patients.%' THEN 'Pacientes' "
+                "WHEN permiso_key LIKE 'appointments.%' THEN 'Citas' "
+                "WHEN permiso_key = 'audit.view' THEN 'Auditoría' "
+                "WHEN permiso_key = 'my_patients.view' OR permiso_key LIKE 'medical_history.%' "
+                "THEN 'Atención clínica' "
+                "WHEN permiso_key LIKE 'states.%' THEN 'Estados' "
+                "WHEN permiso_key LIKE 'documents.%' THEN 'Documentos' "
+                "ELSE 'Otros permisos' END AS nom_grupo "
+                "FROM normalized_permissions"
             )
         )
         conn.execute(
@@ -172,98 +217,6 @@ def verificar_conexion_bd() -> None:
                     "ALTER TABLE clinical_entries ADD COLUMN id_entries_rectifica BIGINT "
                     "REFERENCES clinical_entries(id_entries)"
                 )
-            )
-
-        clinical_permissions_applied = conn.execute(
-            text("SELECT 1 FROM app_schema_migrations WHERE version = :version"),
-            {"version": CLINICAL_HISTORY_MIGRATION},
-        ).first()
-        if not clinical_permissions_applied:
-            role_permissions = {
-                "ADMINISTRADOR": ["doctors.link_user", "medical_history.delete"],
-                "MEDICO": ["medical_history.view", "medical_history.manage"],
-            }
-            for role_name, permissions in role_permissions.items():
-                roles = conn.execute(
-                    text("SELECT id_role, permisos FROM roles WHERE upper(trim(nom_role)) = :role_name FOR UPDATE"),
-                    {"role_name": role_name},
-                ).mappings()
-                for role in roles:
-                    granted = set(role["permisos"] or [])
-                    granted.update(permissions)
-                    conn.execute(
-                        text("UPDATE roles SET permisos = CAST(:permissions AS JSONB) WHERE id_role = :role_id"),
-                        {"permissions": json.dumps(sorted(granted)), "role_id": role["id_role"]},
-                    )
-            conn.execute(
-                text("INSERT INTO app_schema_migrations (version) VALUES (:version)"),
-                {"version": CLINICAL_HISTORY_MIGRATION},
-            )
-
-        role_permission_matrix_applied = conn.execute(
-            text("SELECT 1 FROM app_schema_migrations WHERE version = :version"),
-            {"version": ROLE_PERMISSION_MATRIX_MIGRATION},
-        ).first()
-        if not role_permission_matrix_applied:
-            role_columns = {
-                column["name"] for column in inspect(conn).get_columns("roles")
-            }
-            if "permisos" in role_columns:
-                role_permissions = conn.execute(
-                    text("SELECT id_role, permisos FROM roles")
-                ).mappings()
-                stored_permissions = conn.execute(
-                    text("SELECT id_permiso, nom_permiso, activo FROM permisos")
-                ).mappings().all()
-                for role in role_permissions:
-                    for permission_name in role["permisos"] or []:
-                        permission_key = permission_key_for_name(permission_name)
-                        if permission_key is None:
-                            continue
-                        matching_permissions = [
-                            permission["id_permiso"]
-                            for permission in stored_permissions
-                            if permission["activo"]
-                            and permission_key_for_name(permission["nom_permiso"])
-                            == permission_key
-                        ]
-                        if not matching_permissions:
-                            permission_name = CANONICAL_PERMISSION_NAMES.get(
-                                permission_key, permission_key
-                            )
-                            permission_id = conn.execute(
-                                text(
-                                    "INSERT INTO permisos (nom_permiso) VALUES (:name) "
-                                    "ON CONFLICT (nom_permiso) DO UPDATE "
-                                    "SET nom_permiso = EXCLUDED.nom_permiso "
-                                    "RETURNING id_permiso"
-                                ),
-                                {"name": permission_name},
-                            ).scalar_one()
-                            matching_permissions = [permission_id]
-                            stored_permissions = [
-                                *stored_permissions,
-                                {
-                                    "id_permiso": permission_id,
-                                    "nom_permiso": permission_name,
-                                    "activo": True,
-                                },
-                            ]
-                        for permission_id in matching_permissions:
-                            conn.execute(
-                                text(
-                                    "INSERT INTO matriz_permisos (id_role, id_permiso) "
-                                    "VALUES (:role_id, :permission_id) "
-                                    "ON CONFLICT (id_role, id_permiso) DO NOTHING"
-                                ),
-                                {
-                                    "role_id": role["id_role"],
-                                    "permission_id": permission_id,
-                                },
-                            )
-            conn.execute(
-                text("INSERT INTO app_schema_migrations (version) VALUES (:version)"),
-                {"version": ROLE_PERMISSION_MATRIX_MIGRATION},
             )
 
         patient_documents_applied = conn.execute(
