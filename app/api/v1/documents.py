@@ -13,7 +13,9 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 @router.get("/", response_model=list[DocumentOut])
 def list_documents(
     db: Session = Depends(get_db),
-    _current_user=Depends(require_any_permission("patients.view", "patients.manage")),
+    _current_user=Depends(
+        require_any_permission("patients.view", "patients.manage", "patients.edit")
+    ),
 ) -> list[DocumentCatalog]:
     statement = select(DocumentCatalog).order_by(DocumentCatalog.id_documents)
     return list(db.scalars(statement).all())

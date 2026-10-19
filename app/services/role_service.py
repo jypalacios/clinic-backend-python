@@ -176,7 +176,9 @@ class RoleService:
         return {
             "id_permiso": permission["id_permiso"],
             "nom_permiso": permission["nom_permiso"],
-            "permiso_key": permission_key_for_name(permission["nom_permiso"]),
+            "permiso_key": permission["permiso_key"],
+            "etiqueta": permission["etiqueta"],
+            "nom_grupo": permission["nom_grupo"],
             "activo": permission["activo"],
         }
 
@@ -232,9 +234,11 @@ class RoleService:
             else:
                 self.repo.db.execute(
                     text(
-                        "CALL sp_insertar_matriz_permiso("
-                        ":permission_id, :role_id, :user_id, CAST(now() AS TIMESTAMP), "
-                        ":user_id, CAST(now() AS TIMESTAMP), TRUE)"
+                        "INSERT INTO matriz_permisos ("
+                        "id_permiso, id_role, usu_creacion, fec_creacion, "
+                        "usu_actualizacion, fec_actualizacion, activo"
+                        ") VALUES ("
+                        ":permission_id, :role_id, :user_id, now(), :user_id, now(), TRUE)"
                     ),
                     {
                         "permission_id": permission_id,
@@ -250,10 +254,11 @@ class RoleService:
         updated_by: int,
         active: bool,
     ) -> None:
-        self.repo.db.execute(
+        result = self.repo.db.execute(
             text(
-                "CALL sp_actualizar_matriz_permisos("
-                ":permission_id, :role_id, :user_id, CAST(now() AS TIMESTAMP), :active)"
+                "UPDATE matriz_permisos "
+                "SET usu_actualizacion = :user_id, fec_actualizacion = now(), activo = :active "
+                "WHERE id_permiso = :permission_id AND id_role = :role_id"
             ),
             {
                 "permission_id": permission_id,
@@ -262,6 +267,10 @@ class RoleService:
                 "active": active,
             },
         )
+        if result.rowcount == 0:
+            raise RuntimeError(
+                f"No existe la asignación del permiso {permission_id} al rol {role_id}"
+            )
 
     def _ensure_another_role_manager_if_needed(
         self,

@@ -49,7 +49,8 @@ class RoleRepository:
         return list(
             self.db.execute(
                 text(
-                    "SELECT id_permiso, nom_permiso, activo FROM v_permisos "
+                    "SELECT id_permiso, nom_permiso, activo, permiso_key, etiqueta, nom_grupo "
+                    "FROM v_permisos "
                     f"{where_clause} ORDER BY id_permiso"
                 )
             ).mappings()
@@ -58,7 +59,8 @@ class RoleRepository:
     def get_permission(self, permission_id: int) -> dict | None:
         return self.db.execute(
             text(
-                "SELECT id_permiso, nom_permiso, activo FROM v_permisos "
+                "SELECT id_permiso, nom_permiso, activo, permiso_key, etiqueta, nom_grupo "
+                "FROM v_permisos "
                 "WHERE id_permiso = :permission_id"
             ),
             {"permission_id": permission_id},
@@ -67,7 +69,8 @@ class RoleRepository:
     def get_permission_by_name(self, name: str) -> dict | None:
         return self.db.execute(
             text(
-                "SELECT id_permiso, nom_permiso, activo FROM v_permisos "
+                "SELECT id_permiso, nom_permiso, activo, permiso_key, etiqueta, nom_grupo "
+                "FROM v_permisos "
                 "WHERE lower(nom_permiso) = lower(:name)"
             ),
             {"name": name},
