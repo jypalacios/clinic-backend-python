@@ -115,6 +115,7 @@ def verificar_conexion_bd() -> None:
                 "WHEN 'CREACION_DOCTORES' THEN 'doctors.manage' "
                 "WHEN 'EDICION_DOCTORES' THEN 'doctors.manage' "
                 "WHEN 'ELIMINACION_DOCTORES' THEN 'doctors.manage' "
+                "WHEN 'EDICION_PROFESIONALES' THEN 'doctors.manage' "
                 "WHEN 'VISUALIZACION_PACIENTES' THEN 'patients.view' "
                 "WHEN 'CREACION_PACIENTES' THEN 'patients.manage' "
                 "WHEN 'EDICION_PACIENTES' THEN 'patients.edit' "

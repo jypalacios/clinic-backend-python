@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.appointment import Appointment
 from app.models.doctor import Doctor
 from app.models.patient import Patient
+from app.models.state import State
 
 
 class AppointmentRepository:
@@ -16,7 +17,16 @@ class AppointmentRepository:
         return self.db.query(Appointment).filter(Appointment.id_appointments == appointment_id).first()
 
     def list_all(self) -> list[Appointment]:
-        return self.db.query(Appointment).all()
+        return self.db.query(Appointment).order_by(Appointment.fecha_hora).all()
+
+    def list_by_doctor_user(self, user_id: int) -> list[Appointment]:
+        return (
+            self.db.query(Appointment)
+            .join(Doctor, Doctor.id_doctors == Appointment.id_doctors)
+            .filter(Doctor.id_user == user_id)
+            .order_by(Appointment.fecha_hora)
+            .all()
+        )
 
     def list_by_patient(self, patient_id: int) -> list[Appointment]:
         return self.db.query(Appointment).filter(Appointment.id_patients == patient_id).all()
@@ -34,6 +44,16 @@ class AppointmentRepository:
             select(Doctor).where(Doctor.id_doctors == doctor_id, Doctor.activo.is_(True))
         )
 
+    def get_state_by_name(self, name: str) -> State | None:
+        return self.db.scalar(select(State).where(State.nom_estado == name))
+
+    def list_appointment_states(self, names: tuple[str, ...]) -> list[State]:
+        return list(
+            self.db.scalars(
+                select(State).where(State.nom_estado.in_(names)).order_by(State.id_estado)
+            )
+        )
+
     def has_schedule_conflict(
         self,
         doctor_id: int,
@@ -43,7 +63,7 @@ class AppointmentRepository:
         statement = select(Appointment.id_appointments).where(
             Appointment.id_doctors == doctor_id,
             Appointment.fecha_hora == fecha_hora,
-            Appointment.estado.notin_(("CANCELADA", "NO_ASISTIO")),
+            Appointment.state.has(State.nom_estado.notin_(("CANCELADA", "NO_ASISTIO"))),
         )
         if exclude_appointment_id is not None:
             statement = statement.where(Appointment.id_appointments != exclude_appointment_id)

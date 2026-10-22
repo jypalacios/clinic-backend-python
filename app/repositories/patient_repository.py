@@ -8,6 +8,7 @@ from app.models.doctor import Doctor
 from app.models.document import DocumentCatalog
 from app.models.patient import Patient
 from app.models.sexo import Sexo
+from app.models.state import State
 
 
 sexo_view = table(
@@ -16,6 +17,8 @@ sexo_view = table(
     column("nom_sexo", String),
 )
 
+# Estados de cita que NO cuentan para la relación médico-paciente.
+_EXCLUDED_APPOINTMENT_STATES = ("CANCELADA", "NO_ASISTIO")
 
 class PatientRepository:
     def __init__(self, db: Session):
@@ -54,6 +57,62 @@ class PatientRepository:
             .all()
         )
         return self._attach_sexo_names(results)
+
+    # ------------------------------------------------------------------
+        # NUEVO: listado paginado con búsqueda y alcance (todos / un médico)
+        # ------------------------------------------------------------------
+        def _filters(self, doctor_id: int | None, search: str | None) -> list:
+            filters = []
+            if doctor_id is not None:
+                filters.append(Patient.id_patients.in_(self._doctor_patient_ids(doctor_id)))
+    
+            term = (search or "").strip()
+            if term:
+                pattern = f"%{_escape_like(term)}%"
+                # Se usa el operador || (no func.concat) para poder respaldar la
+                # búsqueda con un índice GIN trigram sobre la misma expresión.
+                nombre_apellido = Patient.nom_patients + " " + Patient.ape_patients
+                apellido_nombre = Patient.ape_patients + " " + Patient.nom_patients
+                filters.append(
+                    or_(
+                        Patient.ced_patients.ilike(pattern, escape="\\"),
+                        nombre_apellido.ilike(pattern, escape="\\"),
+                        apellido_nombre.ilike(pattern, escape="\\"),
+                    )
+                )
+            return filters
+    
+        def list_page(
+            self,
+            *,
+            limit: int,
+            offset: int,
+            search: str | None,
+            doctor_id: int | None = None,
+        ) -> tuple[list[Patient], int]:
+            filters = self._filters(doctor_id, search)
+            sexo_join = sexo_view.c.id_sexo == Patient.id_sexo
+    
+            # total con el MISMO join (inner) y los MISMOS filtros que los items
+            total = (
+                self.db.scalar(
+                    select(func.count()).select_from(Patient).join(sexo_view, sexo_join).where(*filters)
+                )
+                or 0
+            )
+    
+            statement = (
+                select(Patient, sexo_view.c.nom_sexo)
+                .options(joinedload(Patient.document))
+                .join(sexo_view, sexo_join)
+                .where(*filters)
+                # orden determinista: sin id_patients la paginación puede repetir u omitir filas
+                .order_by(Patient.ape_patients, Patient.nom_patients, Patient.id_patients)
+                .limit(limit)
+                .offset(offset)
+            )
+            return self._attach_sexo_names(self.db.execute(statement).all()), total
+
 
     def list_sexos(self) -> list[Sexo]:
         return list(self.db.scalars(select(Sexo)).all())
@@ -113,13 +172,41 @@ class PatientRepository:
                 Doctor.id_user == user_id,
                 Doctor.activo.is_(True),
                 Patient.activo.is_(True),
-                Appointment.estado.notin_(("CANCELADA", "NO_ASISTIO")),
+                Appointment.state.has(State.nom_estado.notin_(("CANCELADA", "NO_ASISTIO"))),
             )
             .distinct()
             .order_by(Patient.ape_patients, Patient.nom_patients)
         )
         return self._attach_sexo_names(self.db.execute(statement).all())
 
+    
+    @staticmethod
+    def _doctor_patient_ids(user_id: int):
+        """Subconsulta con los id de pacientes visibles para el médico `user_id`."""
+        patient = aliased(Patient)  # alias: evita correlación con la consulta externa
+        return (
+            select(Appointment.id_patients)
+            .join(Doctor, Doctor.id_doctors == Appointment.id_doctors)
+            .join(patient, patient.id_patients == Appointment.id_patients)
+            .where(
+                Doctor.id_user == user_id,
+                Doctor.activo.is_(True),
+                patient.activo.is_(True),
+                Appointment.state.has(State.nom_estado.notin_(_EXCLUDED_APPOINTMENT_STATES)),
+            )
+            .correlate(None)
+        )
+    
+    def list_for_doctor(self, user_id: int) -> list[Patient]:
+        statement = (
+            select(Patient, sexo_view.c.nom_sexo)
+            .options(joinedload(Patient.document))
+            .join(sexo_view, sexo_view.c.id_sexo == Patient.id_sexo)
+            .where(Patient.id_patients.in_(self._doctor_patient_ids(user_id)))
+            .order_by(Patient.ape_patients, Patient.nom_patients, Patient.id_patients)
+        )
+        return self._attach_sexo_names(self.db.execute(statement).all())
+    
     @staticmethod
     def _attach_sexo_names(results) -> list[Patient]:
         patients = []
@@ -129,19 +216,15 @@ class PatientRepository:
         return patients
 
     def is_assigned_to_doctor(self, patient_id: int, user_id: int) -> bool:
-        statement = (
-            select(Appointment.id_appointments)
-            .join(Doctor, Doctor.id_doctors == Appointment.id_doctors)
-            .where(
-                Appointment.id_patients == patient_id,
-                Doctor.id_user == user_id,
-                Doctor.activo.is_(True),
-                Patient.activo.is_(True),
-                Appointment.estado.notin_(("CANCELADA", "NO_ASISTIO")),
+            # CORRECCIÓN: la versión anterior usaba Patient.activo sin unir la tabla
+            # Patient (producto cartesiano): la condición se cumplía si existía
+            # CUALQUIER paciente activo, no el paciente consultado.
+            statement = (
+                self._doctor_patient_ids(user_id)
+                .where(Appointment.id_patients == patient_id)
+                .limit(1)
             )
-            .limit(1)
-        )
-        return self.db.scalar(statement) is not None
+            return self.db.scalar(statement) is not None
 
     def create(self, patient: Patient) -> Patient:
         try:

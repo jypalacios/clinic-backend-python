@@ -28,6 +28,7 @@ class PatientService:
             direccion=data.direccion,
             eps=data.eps,
             contacto_emergencia=data.contacto_emergencia,
+            discapacidad=data.discapacidad,
         )
 
         return self.repo.create(patient)
@@ -53,6 +54,7 @@ class PatientService:
         patient.direccion = data.direccion
         patient.eps = data.eps
         patient.contacto_emergencia = data.contacto_emergencia
+        patient.discapacidad = data.discapacidad
         return self.repo.update(patient)
 
     def list_patients(self, user: User) -> list[Patient]:
