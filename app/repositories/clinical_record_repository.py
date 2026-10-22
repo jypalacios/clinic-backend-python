@@ -2,6 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.appointment import Appointment
+from app.models.state import State
 from app.models.clinical_record import ClinicalEntry, ClinicalRecord
 from app.models.doctor import Doctor
 from app.models.patient import Patient
@@ -52,7 +53,7 @@ class ClinicalRecordRepository:
             .where(
                 Appointment.id_doctors == doctor_id,
                 Appointment.id_patients == patient_id,
-                Appointment.estado.notin_(("CANCELADA", "NO_ASISTIO")),
+                Appointment.state.has(State.nom_estado.notin_(("CANCELADA", "NO_ASISTIO"))),
             )
             .limit(1)
         )

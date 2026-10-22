@@ -36,6 +36,7 @@ class Patient(Base):
     direccion: Mapped[str | None] = mapped_column(String(255))
     eps: Mapped[str | None] = mapped_column(String(100))
     contacto_emergencia: Mapped[str | None] = mapped_column(String(200))
+    discapacidad: Mapped[bool | None] = mapped_column(Boolean)
 
     document: Mapped[Document] = relationship(back_populates="patients")
     sexo: Mapped["Sexo"] = relationship(back_populates="patients")

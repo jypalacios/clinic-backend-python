@@ -35,6 +35,7 @@ LEGACY_PERMISSION_KEYS: dict[str, str] = {
     "CREACION_DOCTORES": "doctors.manage",
     "EDICION_DOCTORES": "doctors.manage",
     "ELIMINACION_DOCTORES": "doctors.manage",
+    "EDICION_PROFESIONALES": "doctors.manage",
     "VISUALIZACION_DOCTORES": "doctors.view",
     "CREACION_CITAS": "appointments.manage",
     "EDICION_CITAS": "appointments.manage",

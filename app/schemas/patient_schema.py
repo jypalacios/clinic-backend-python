@@ -17,6 +17,7 @@ class PatientCreate(BaseModel):
     direccion: str | None = Field(default=None, max_length=255)
     eps: str | None = Field(default=None, max_length=100)
     contacto_emergencia: str | None = Field(default=None, max_length=200)
+    discapacidad: bool = False
 
 
 class PatientOut(BaseModel):
@@ -32,10 +33,11 @@ class PatientOut(BaseModel):
     nom_sexo: str
     activo: int = 0
     telefono: str | None = None
-    email: EmailStr | None = None
+    email: str | None = None
     direccion: str | None = None
     eps: str | None = None
     contacto_emergencia: str | None = None
+    discapacidad: bool | None = None
 
     @field_validator("activo", mode="before")
     @classmethod
@@ -48,3 +50,9 @@ class PatientOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class PatientPage(BaseModel):
+    items: list[PatientOut]
+    total: int
+    limit: int
+    offset: int
