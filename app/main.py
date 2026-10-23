@@ -15,7 +15,7 @@ from app.models.role import Role
 from app.models.sexo import Sexo
 from app.models.specialty import Specialty
 from app.models.user import User
-from app.api.v1 import appointments, auth, clinical_records, doctors, documents, health, patients, roles, sexos, specialties, users
+from app.api.v1 import allergies, appointments, auth, clinical_records, doctors, documents, health, patients, roles, sexos, specialties, users
 
 settings = get_settings()
 PATIENT_DOCUMENTS_MIGRATION = "20261008_patient_documents"
@@ -42,6 +42,8 @@ app.include_router(specialties.router, prefix=settings.API_V1_PREFIX)
 app.include_router(doctors.router, prefix=settings.API_V1_PREFIX, tags=["doctors"])
 app.include_router(appointments.router, prefix=settings.API_V1_PREFIX, tags=["appointments"])
 app.include_router(clinical_records.router, prefix=settings.API_V1_PREFIX)
+app.include_router(allergies.types_router, prefix=settings.API_V1_PREFIX)
+app.include_router(allergies.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.on_event("startup")
@@ -145,6 +147,12 @@ def verificar_conexion_bd() -> None:
                 "WHEN 'EDICION_ESPECIALISTAS' THEN 'specialties.manage' "
                 "WHEN 'ELIMINACION_ESPECIALISTA' THEN 'specialties.manage' "
                 "WHEN 'ELIMINACION_ESPECIALISTAS' THEN 'specialties.manage' "
+                "WHEN 'VISUALIZACION_TIPOALERGIAS' THEN 'allergy_types.view' "
+                "WHEN 'CREACION_TIPOALERGIAS' THEN 'allergy_types.manage' "
+                "WHEN 'EDICION_TIPOALERGIAS' THEN 'allergy_types.manage' "
+                "WHEN 'VISUALIZACION_ALERGIAS' THEN 'allergies.view' "
+                "WHEN 'CREACION_ALERGIAS' THEN 'allergies.manage' "
+                "WHEN 'EDICION_ALERGIAS' THEN 'allergies.manage' "
                 "ELSE CASE WHEN position('.' IN lower(trim(p.nom_permiso))) > 0 "
                 "THEN lower(trim(p.nom_permiso)) ELSE NULL END END AS permiso_key "
                 "FROM permisos p) "
@@ -175,6 +183,10 @@ def verificar_conexion_bd() -> None:
                 "WHEN 'states.manage' THEN 'Gestionar estados' "
                 "WHEN 'documents.view' THEN 'Consultar documentos' "
                 "WHEN 'documents.manage' THEN 'Gestionar documentos' "
+                "WHEN 'allergy_types.view' THEN 'Consultar tipos de alergias' "
+                "WHEN 'allergy_types.manage' THEN 'Crear y editar tipos de alergias' "
+                "WHEN 'allergies.view' THEN 'Consultar alergias de pacientes' "
+                "WHEN 'allergies.manage' THEN 'Registrar y editar alergias de pacientes' "
                 "ELSE nom_permiso END AS etiqueta, "
                 "CASE WHEN permiso_key LIKE 'users.%' THEN 'Usuarios' "
                 "WHEN permiso_key = 'roles.manage' THEN 'Roles y permisos' "
@@ -187,6 +199,8 @@ def verificar_conexion_bd() -> None:
                 "THEN 'Atención clínica' "
                 "WHEN permiso_key LIKE 'states.%' THEN 'Estados' "
                 "WHEN permiso_key LIKE 'documents.%' THEN 'Documentos' "
+                "WHEN permiso_key LIKE 'allergy_types.%' THEN 'Tipos de alergias' "
+                "WHEN permiso_key LIKE 'allergies.%' THEN 'Alergias' "
                 "ELSE 'Otros permisos' END AS nom_grupo "
                 "FROM normalized_permissions"
             )

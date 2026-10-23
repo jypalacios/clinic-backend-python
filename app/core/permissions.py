@@ -21,6 +21,10 @@ Permission = Literal[
     "medical_history.view",
     "medical_history.manage",
     "medical_history.delete",
+    "allergy_types.view",
+    "allergy_types.manage",
+    "allergies.view",
+    "allergies.manage",
 ]
 
 LEGACY_PERMISSION_KEYS: dict[str, str] = {
@@ -70,6 +74,12 @@ LEGACY_PERMISSION_KEYS: dict[str, str] = {
     "EDICION_ESPECIALISTAS": "specialties.manage",
     "ELIMINACION_ESPECIALISTA": "specialties.manage",
     "ELIMINACION_ESPECIALISTAS": "specialties.manage",
+    "VISUALIZACION_TIPOALERGIAS": "allergy_types.view",
+    "CREACION_TIPOALERGIAS": "allergy_types.manage",
+    "EDICION_TIPOALERGIAS": "allergy_types.manage",
+    "VISUALIZACION_ALERGIAS": "allergies.view",
+    "CREACION_ALERGIAS": "allergies.manage",
+    "EDICION_ALERGIAS": "allergies.manage",
 }
 
 def permission_key_for_name(name: str) -> str | None:
