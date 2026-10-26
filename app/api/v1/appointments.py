@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.deps import require_permissions
+from app.core.deps import require_any_permission, require_permissions
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.appointment_schema import (
@@ -67,6 +67,22 @@ def register_appointment_ingreso(
 ):
     try:
         return AppointmentService(db).register_ingreso(appointment_id, data, current_user)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.put("/{appointment_id}/finaliza", response_model=AppointmentOut)
+def finalize_appointment(
+    appointment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_any_permission(
+            "appointments.manage", "consultations.create", "consultations.edit", "medical_history.manage"
+        )
+    ),
+):
+    try:
+        return AppointmentService(db).finalize_appointment(appointment_id, current_user)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

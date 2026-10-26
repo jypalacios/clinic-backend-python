@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from app.core.deps import require_permissions, require_roles
+from app.core.deps import require_any_permission, require_permissions, require_roles
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.clinical_record_schema import ClinicalEntryCreate, ClinicalRecordCreate, ClinicalRecordOut
@@ -13,7 +13,9 @@ router = APIRouter(prefix="/clinical-records", tags=["clinical-records"])
 @router.get("/", response_model=list[ClinicalRecordOut])
 def list_clinical_records(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permissions("medical_history.view")),
+    current_user: User = Depends(
+        require_any_permission("medical_history.view", "consultations.view")
+    ),
 ):
     return ClinicalRecordService(db).list_records(current_user)
 
@@ -22,7 +24,9 @@ def list_clinical_records(
 def create_clinical_record(
     data: ClinicalRecordCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permissions("medical_history.manage")),
+    current_user: User = Depends(
+        require_any_permission("medical_history.manage", "consultations.create")
+    ),
 ):
     try:
         return ClinicalRecordService(db).create_record(data, current_user)
@@ -40,7 +44,9 @@ def correct_clinical_entry(
     entry_id: int,
     data: ClinicalEntryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permissions("medical_history.manage")),
+    current_user: User = Depends(
+        require_any_permission("medical_history.manage", "consultations.edit")
+    ),
 ):
     try:
         return ClinicalRecordService(db).append_entry(record_id, data, entry_id, current_user)
@@ -57,7 +63,9 @@ def add_clinical_entry(
     record_id: int,
     data: ClinicalEntryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permissions("medical_history.manage")),
+    current_user: User = Depends(
+        require_any_permission("medical_history.manage", "consultations.create")
+    ),
 ):
     try:
         return ClinicalRecordService(db).append_entry(record_id, data, None, current_user)

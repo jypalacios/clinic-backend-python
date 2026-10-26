@@ -29,6 +29,9 @@ class RolePermissionTests(unittest.TestCase):
         self.assertEqual(permission_key_for_name("EDICION_PACIENTES"), "patients.edit")
         self.assertEqual(permission_key_for_name("ELIMINACION_PACIENTES"), "patients.delete")
         self.assertEqual(permission_key_for_name("VISUALIZACION_PACIENTES"), "patients.view")
+        self.assertEqual(permission_key_for_name("consultations.view"), "consultations.view")
+        self.assertEqual(permission_key_for_name("CREACION_CONSULTAS"), "consultations.create")
+        self.assertEqual(permission_key_for_name("EDICION_CONSULTAS"), "consultations.edit")
         self.assertIsNone(permission_key_for_name("PERMISO_DESCONOCIDO"))
 
     def test_patient_create_permission_does_not_grant_edit_or_delete(self):
@@ -36,6 +39,10 @@ class RolePermissionTests(unittest.TestCase):
         self.assertFalse(_has_permission({"patients.manage"}, "patients.delete"))
         self.assertTrue(_has_permission({"patients.edit"}, "patients.edit"))
         self.assertTrue(_has_permission({"patients.delete"}, "patients.delete"))
+
+    def test_consult_create_grants_view_without_granting_edit(self):
+        self.assertTrue(_has_permission({"consultations.create"}, "consultations.view"))
+        self.assertFalse(_has_permission({"consultations.create"}, "consultations.edit"))
 
     def test_permission_output_uses_normalized_view_metadata(self):
         self.assertEqual(
