@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -12,6 +12,12 @@ from app.models.state import State
 class AppointmentRepository:
     def __init__(self, db: Session):
         self.db = db
+
+    def finalize(self, appointment_id: int, finished_at: datetime, user_id: int) -> None:
+        self.db.execute(
+            text("CALL sp_actualizar_appointment_finaliza(:id, CAST(:finished_at AS TIMESTAMPTZ), :user_id)"),
+            {"id": appointment_id, "finished_at": finished_at, "user_id": user_id},
+        )
 
     def get_by_id(self, appointment_id: int) -> Appointment | None:
         return self.db.query(Appointment).filter(Appointment.id_appointments == appointment_id).first()

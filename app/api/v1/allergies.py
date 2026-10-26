@@ -69,7 +69,11 @@ def update_allergy_type(
 def list_allergies(
     patient_id: int | None = None,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(require_permissions("allergies.view")),
+    _current_user: User = Depends(
+        require_any_permission(
+            "allergies.view", "consultations.view", "medical_history.view"
+        )
+    ),
 ):
     return AllergyService(db).list_allergies(patient_id)
 

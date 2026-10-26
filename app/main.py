@@ -20,6 +20,7 @@ from app.api.v1 import allergies, appointments, auth, clinical_records, doctors,
 settings = get_settings()
 PATIENT_DOCUMENTS_MIGRATION = "20261008_patient_documents"
 PATIENT_AGE_MIGRATION = "20261009_patient_age"
+CONSULTATIONS_PERMISSIONS_MIGRATION = "20261023_consultations_permissions"
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.APP_VERSION)
 
@@ -93,6 +94,62 @@ def verificar_conexion_bd() -> None:
                 )
             )
 
+        consultations_permissions_applied = conn.execute(
+            text(
+                "SELECT 1 FROM app_schema_migrations WHERE version = :version"
+            ),
+            {"version": CONSULTATIONS_PERMISSIONS_MIGRATION},
+        ).first()
+        if not consultations_permissions_applied:
+            conn.execute(
+                text(
+                    "INSERT INTO permisos (nom_permiso) VALUES "
+                    "('consultations.view'), "
+                    "('consultations.create'), "
+                    "('consultations.edit') "
+                    "ON CONFLICT (nom_permiso) DO NOTHING"
+                )
+            )
+            conn.execute(
+                text(
+                    "WITH permission_mapping (consultation_permission, history_permission) AS ("
+                    "VALUES "
+                    "('consultations.view', 'medical_history.view'), "
+                    "('consultations.view', 'medical_history.manage'), "
+                    "('consultations.view', 'VISUALIZACION_HISTORIAS'), "
+                    "('consultations.view', 'CREACION_HISTORIAS'), "
+                    "('consultations.view', 'EDICION_HISTORIAS'), "
+                    "('consultations.create', 'medical_history.manage'), "
+                    "('consultations.create', 'CREACION_HISTORIAS'), "
+                    "('consultations.create', 'EDICION_HISTORIAS'), "
+                    "('consultations.edit', 'medical_history.manage'), "
+                    "('consultations.edit', 'CREACION_HISTORIAS'), "
+                    "('consultations.edit', 'EDICION_HISTORIAS')"
+                    ") "
+                    "INSERT INTO matriz_permisos (id_role, id_permiso, activo) "
+                    "SELECT DISTINCT history_assignment.id_role, "
+                    "consultation_permission.id_permiso, TRUE "
+                    "FROM permission_mapping mapping "
+                    "JOIN permisos history_permission "
+                    "ON lower(trim(history_permission.nom_permiso)) = "
+                    "lower(mapping.history_permission) "
+                    "AND history_permission.activo IS TRUE "
+                    "JOIN matriz_permisos history_assignment "
+                    "ON history_assignment.id_permiso = history_permission.id_permiso "
+                    "AND history_assignment.activo IS TRUE "
+                    "JOIN permisos consultation_permission "
+                    "ON consultation_permission.nom_permiso = mapping.consultation_permission "
+                    "AND consultation_permission.activo IS TRUE "
+                    "ON CONFLICT (id_role, id_permiso) DO NOTHING"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO app_schema_migrations (version) VALUES (:version)"
+                ),
+                {"version": CONSULTATIONS_PERMISSIONS_MIGRATION},
+            )
+
         conn.execute(text("DROP VIEW IF EXISTS v_permisos"))
         conn.execute(
             text(
@@ -130,6 +187,9 @@ def verificar_conexion_bd() -> None:
                 "WHEN 'CREACION_HISTORIAS' THEN 'medical_history.manage' "
                 "WHEN 'EDICION_HISTORIAS' THEN 'medical_history.manage' "
                 "WHEN 'ELIMINACION_HISTORIAS' THEN 'medical_history.delete' "
+                "WHEN 'VISUALIZACION_CONSULTAS' THEN 'consultations.view' "
+                "WHEN 'CREACION_CONSULTAS' THEN 'consultations.create' "
+                "WHEN 'EDICION_CONSULTAS' THEN 'consultations.edit' "
                 "WHEN 'VISUALIZACION_ESTADOS' THEN 'states.view' "
                 "WHEN 'CREACION_ESTADOS' THEN 'states.manage' "
                 "WHEN 'EDICION_ESTADOS' THEN 'states.manage' "
@@ -179,6 +239,9 @@ def verificar_conexion_bd() -> None:
                 "WHEN 'medical_history.view' THEN 'Consultar historia clínica' "
                 "WHEN 'medical_history.manage' THEN 'Crear historias y registrar/rectificar notas' "
                 "WHEN 'medical_history.delete' THEN 'Archivar historias clínicas conservando las notas' "
+                "WHEN 'consultations.view' THEN 'Consultar consultas clínicas' "
+                "WHEN 'consultations.create' THEN 'Registrar consultas clínicas' "
+                "WHEN 'consultations.edit' THEN 'Rectificar consultas clínicas' "
                 "WHEN 'states.view' THEN 'Consultar estados' "
                 "WHEN 'states.manage' THEN 'Gestionar estados' "
                 "WHEN 'documents.view' THEN 'Consultar documentos' "
@@ -197,6 +260,7 @@ def verificar_conexion_bd() -> None:
                 "WHEN permiso_key = 'audit.view' THEN 'Auditoría' "
                 "WHEN permiso_key = 'my_patients.view' OR permiso_key LIKE 'medical_history.%' "
                 "THEN 'Atención clínica' "
+                "WHEN permiso_key LIKE 'consultations.%' THEN 'Consultas' "
                 "WHEN permiso_key LIKE 'states.%' THEN 'Estados' "
                 "WHEN permiso_key LIKE 'documents.%' THEN 'Documentos' "
                 "WHEN permiso_key LIKE 'allergy_types.%' THEN 'Tipos de alergias' "

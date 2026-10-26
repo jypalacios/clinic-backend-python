@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -138,6 +138,31 @@ class AppointmentService:
                 detalle={"id_appointments": appointment_id},
             )
         )
+        return self._commit(appointment)
+
+    def finalize_appointment(self, appointment_id: int, user: User) -> Appointment:
+        appointment = self.repo.get_by_id(appointment_id)
+        if not appointment:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada")
+        permissions = set(user.role.permisos if user and user.role else [])
+        if "appointments.manage" not in permissions:
+            own_ids = {item.id_appointments for item in self.repo.list_by_doctor_user(user.id)}
+            if appointment_id not in own_ids:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La cita no pertenece al médico autenticado")
+        if appointment.nom_estado not in {"PROGRAMADA", "CONFIRMADA", WAITING_ROOM_STATE}:
+            raise ValueError("Solo se pueden finalizar citas programadas, confirmadas o en sala de espera")
+        state = self.repo.get_state_by_name("ATENDIDA")
+        if state is None:
+            raise ValueError("El estado de cita 'ATENDIDA' no está configurado")
+        finished_at = datetime.now(timezone.utc)
+        appointment.id_estado = state.id_estado
+        appointment.state = state
+        try:
+            self.repo.db.flush()
+            self.repo.finalize(appointment_id, finished_at, user.id)
+        except DBAPIError as exc:
+            self.repo.db.rollback()
+            raise ValueError(str(getattr(exc.orig, "args", [exc])[0]).splitlines()[0]) from exc
         return self._commit(appointment)
 
     def _validate_schedule(

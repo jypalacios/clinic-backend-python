@@ -53,3 +53,52 @@ SELECT cron.schedule(
               )::INTEGER;
     $job$
 );
+
+-- ---------------------------------------------------------------------
+-- Cierre diario de citas del día anterior (01:00, zona America/Bogota)
+--   PROGRAMADA / CONFIRMADA -> NO_ASISTIO
+--   EN SALA DE ESPERA       -> ATENDIDA
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION cerrar_citas_dia_anterior()
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_programada  INTEGER;
+    v_confirmada  INTEGER;
+    v_sala        INTEGER;
+    v_no_asistio  INTEGER;
+    v_atendida    INTEGER;
+    v_inicio      TIMESTAMPTZ;
+    v_fin         TIMESTAMPTZ;
+    v_total       INTEGER;
+BEGIN
+    SELECT id_estado INTO STRICT v_programada FROM estados WHERE proceso = 'citas' AND nom_estado = 'PROGRAMADA';
+    SELECT id_estado INTO STRICT v_confirmada FROM estados WHERE proceso = 'citas' AND nom_estado = 'CONFIRMADA';
+    SELECT id_estado INTO STRICT v_sala       FROM estados WHERE proceso = 'citas' AND nom_estado = 'EN SALA DE ESPERA';
+    SELECT id_estado INTO STRICT v_no_asistio FROM estados WHERE proceso = 'citas' AND nom_estado = 'NO_ASISTIO';
+    SELECT id_estado INTO STRICT v_atendida   FROM estados WHERE proceso = 'citas' AND nom_estado = 'ATENDIDA';
+
+    v_fin    := date_trunc('day', now() AT TIME ZONE 'America/Bogota') AT TIME ZONE 'America/Bogota';
+    v_inicio := v_fin - INTERVAL '1 day';
+
+    UPDATE appointments
+    SET id_estado = CASE
+                        WHEN id_estado = v_sala THEN v_atendida
+                        ELSE v_no_asistio
+                    END,
+        fec_actualizacion = now()
+    WHERE fecha_hora >= v_inicio
+      AND fecha_hora <  v_fin
+      AND id_estado IN (v_programada, v_confirmada, v_sala);
+
+    GET DIAGNOSTICS v_total = ROW_COUNT;
+    RETURN v_total;
+END;
+$$;
+
+SELECT cron.schedule(
+    'cerrar-citas-dia-anterior',
+    '0 1 * * *',
+    $job$ SELECT cerrar_citas_dia_anterior(); $job$
+);

@@ -180,15 +180,17 @@ Para instalar o actualizar los procedimientos almacenados, ejecute `02_procedimi
 - `POST /api/v1/patients/import` vuelve a validar el CSV y lo importa en una única transacción; rechaza el archivo completo si alguna fila es inválida.
 - `POST /api/v1/appointments/` crea una cita con estado inicial `PROGRAMADA`.
 - `PUT /api/v1/appointments/{appointment_id}` reprograma la fecha/hora o el médico de una cita programada o confirmada; requiere `appointments.manage`.
-- `GET/POST /api/v1/clinical-records/` consulta y abre historias clínicas.
+- `GET/POST /api/v1/clinical-records/` consulta y abre historias clínicas; acepta los permisos `medical_history.view` / `medical_history.manage` o `consultations.view` / `consultations.create`.
 - Para médicos, `GET /api/v1/patients/` se limita a sus pacientes con citas no canceladas ni marcadas como inasistencia.
-- `POST /api/v1/clinical-records/{record_id}/entries` agrega una evolución.
-- `PUT /api/v1/clinical-records/{record_id}/entries/{entry_id}` registra una rectificación inmutable.
+- `POST /api/v1/clinical-records/{record_id}/entries` agrega una evolución con `consultations.create` o `medical_history.manage`.
+- `PUT /api/v1/clinical-records/{record_id}/entries/{entry_id}` registra una rectificación inmutable con `consultations.edit` o `medical_history.manage`.
 - `DELETE /api/v1/clinical-records/{record_id}` archiva la historia (permiso exclusivo de administración).
 - `PUT /api/v1/clinical-records/{record_id}/restore` restaura una historia archivada (permiso exclusivo de administración).
 - `PUT /api/v1/doctors/{doctor_id}/user` vincula una cuenta con rol médico a su perfil profesional.
 - `GET /api/v1/auth/me` devuelve los permisos efectivos del usuario para construir el menú y proteger rutas.
 - Los permisos `*.manage` incluyen también el permiso de consulta `*.view` del mismo módulo.
+- En la sección médica, `consultations.view` habilita la consulta, `consultations.create` habilita el registro de consultas y `consultations.edit` habilita la rectificación; los permisos se asignan desde Roles y permisos.
+- Al iniciar, la migración de permisos crea las claves de consultas y replica para cada rol los accesos activos equivalentes de Historia clínica; los roles sin acceso a Historia clínica no reciben acceso a Consultas.
 - El rol `ASISTENTE` puede consultar la lista y registrar usuarios no administradores; solo roles con `users.manage` pueden editar usuarios, cambiar contraseñas y administrar estados.
 - El rol `MEDICO` recibe permiso de consulta y gestión de historias; `ADMINISTRADOR` recibe archivo lógico y vinculación de cuentas médicas.
 - La primera actualización posterior a esta versión agrega una sola vez `users.view` y `users.create` a `ASISTENTE`, conservando los permisos ya configurados.
