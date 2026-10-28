@@ -15,7 +15,7 @@ class PatientCreate(BaseModel):
     telefono: str | None = Field(default=None, max_length=20)
     email: EmailStr | None = Field(default=None, max_length=150)
     direccion: str | None = Field(default=None, max_length=255)
-    eps: str | None = Field(default=None, max_length=100)
+    nit_entidad: int | None = Field(default=None, gt=0)
     contacto_emergencia: str | None = Field(default=None, max_length=200)
     discapacidad: bool = False
 
@@ -35,7 +35,8 @@ class PatientOut(BaseModel):
     telefono: str | None = None
     email: str | None = None
     direccion: str | None = None
-    eps: str | None = None
+    nit_entidad: int | None = None
+    nom_entidad: str | None = None
     contacto_emergencia: str | None = None
     discapacidad: bool | None = None
 

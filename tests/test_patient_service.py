@@ -36,7 +36,7 @@ def make_update_data(identification="12345"):
         telefono="3001234567",
         email="ana@example.com",
         direccion="Calle 1",
-        eps="EPS",
+        nit_entidad=None,
         contacto_emergencia="Contacto",
     )
 
@@ -48,7 +48,7 @@ class PatientServiceTests(unittest.TestCase):
         return service
 
     def test_update_changes_patient_fields_and_allows_its_existing_identification(self):
-        patient = SimpleNamespace(id_patients=4)
+        patient = SimpleNamespace(id_patients=4, nit_entidad=None)
         service = self.make_service(patient, duplicate=patient)
 
         result = service.update_patient(4, make_update_data())
@@ -59,7 +59,7 @@ class PatientServiceTests(unittest.TestCase):
         self.assertEqual(patient.email, "ana@example.com")
 
     def test_update_rejects_identification_used_by_another_patient(self):
-        patient = SimpleNamespace(id_patients=4)
+        patient = SimpleNamespace(id_patients=4, nit_entidad=None)
         duplicate = SimpleNamespace(id_patients=5)
         service = self.make_service(patient, duplicate=duplicate)
 

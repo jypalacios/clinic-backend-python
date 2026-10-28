@@ -25,6 +25,8 @@ class ClinicalPatientOut(BaseModel):
     ced_patients: str
     nom_patients: str
     ape_patients: str
+    edad: int
+    nom_sexo: str
 
 
 class ClinicalDoctorOut(BaseModel):

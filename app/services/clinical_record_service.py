@@ -191,6 +191,8 @@ class ClinicalRecordService:
                 "ced_patients": record.patient.ced_patients,
                 "nom_patients": record.patient.nom_patients,
                 "ape_patients": record.patient.ape_patients,
+                "edad": record.patient.edad,
+                "nom_sexo": record.patient.sexo.nom_sexo,
             },
             "id_doctors": record.id_doctors,
             "doctor": {

@@ -28,6 +28,8 @@ Permission = Literal[
     "allergy_types.manage",
     "allergies.view",
     "allergies.manage",
+    "entities.view",
+    "entities.manage",
 ]
 
 LEGACY_PERMISSION_KEYS: dict[str, str] = {
