@@ -6,6 +6,7 @@ from app.models.appointment import Appointment
 from app.models.audit_log import AuditLog
 from app.models.doctor import Doctor
 from app.models.document import DocumentCatalog
+from app.models.entity import CliEntidad
 from app.models.patient import Patient
 from app.models.sexo import Sexo
 from app.models.state import State
@@ -124,6 +125,12 @@ class PatientRepository:
     def get_document(self, document_id: int) -> DocumentCatalog | None:
         statement = select(DocumentCatalog).where(DocumentCatalog.id_documents == document_id)
         return self.db.scalar(statement)
+
+    def get_entity(self, nit: int) -> CliEntidad | None:
+        return self.db.get(CliEntidad, nit)
+
+    def list_entities(self) -> list[CliEntidad]:
+        return list(self.db.scalars(select(CliEntidad).where(CliEntidad.activo.is_(True))).all())
 
     def existing_identifications(
         self,

@@ -36,6 +36,9 @@ class FakePatientRepository:
     def list_documents(self):
         return self.documents
 
+    def list_entities(self):
+        return []
+
     def existing_identifications(self, identifications: set[tuple[int, str]]):
         return self.existing.intersection(identifications)
 

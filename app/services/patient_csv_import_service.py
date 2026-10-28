@@ -31,7 +31,7 @@ CSV_FIELDS = {
     "telefono": "telefono",
     "email": "email",
     "direccion": "direccion",
-    "eps": "eps",
+    "eps": "nit_entidad",
     "contacto_emergencia": "contacto_emergencia",
 }
 REQUIRED_HEADERS = {"tipo_documento", "cedula", "nombres", "apellidos", "fecha_nacimiento", "sexo"}
@@ -45,7 +45,7 @@ FIELD_LABELS = {
     "telefono": "Teléfono",
     "email": "Correo electrónico",
     "direccion": "Dirección",
-    "eps": "EPS",
+    "nit_entidad": "Entidad",
     "contacto_emergencia": "Contacto de emergencia",
 }
 
@@ -140,6 +140,9 @@ class PatientCSVImportService:
             for document in documents
             for value in (document.desc_tipo, document.desc_documents)
         }
+        entities = self.repo.list_entities()
+        entities_lookup = {str(entity.nit): entity.nit for entity in entities}
+        entities_lookup.update({_normalize(entity.nom_entidad): entity.nit for entity in entities})
         parsed_rows: list[dict[str, Any]] = []
         data_rows = 0
         for row_number, raw_row in enumerate(reader, start=2):
@@ -179,6 +182,12 @@ class PatientCSVImportService:
                 if header not in {"sexo", "tipo_documento"}
             }
             patient_data["id_documents"] = document_id
+            entity_value = source.get("eps", "")
+            if entity_value:
+                entity_nit = entities_lookup.get(entity_value) or entities_lookup.get(_normalize(entity_value))
+                if entity_nit is None:
+                    messages.append("Entidad no reconocida; use el NIT o el nombre de una entidad activa")
+                patient_data["nit_entidad"] = entity_nit
             patient_data["id_sexo"] = sex_id if sex_id is not None else 1
             try:
                 patient = PatientCreate.model_validate(patient_data)

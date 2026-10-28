@@ -16,7 +16,7 @@ class ClinicalRecordRepository:
         statement = (
             select(ClinicalRecord)
             .options(
-                joinedload(ClinicalRecord.patient),
+                joinedload(ClinicalRecord.patient).joinedload(Patient.sexo),
                 joinedload(ClinicalRecord.doctor),
                 selectinload(ClinicalRecord.entries).joinedload(ClinicalEntry.doctor),
             )
@@ -32,7 +32,7 @@ class ClinicalRecordRepository:
         statement = (
             select(ClinicalRecord)
             .options(
-                joinedload(ClinicalRecord.patient),
+                joinedload(ClinicalRecord.patient).joinedload(Patient.sexo),
                 joinedload(ClinicalRecord.doctor),
                 selectinload(ClinicalRecord.entries).joinedload(ClinicalEntry.doctor),
             )

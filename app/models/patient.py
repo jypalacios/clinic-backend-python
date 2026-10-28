@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.document import Document
+from app.models.entity import CliEntidad
 
 if TYPE_CHECKING:
     from app.models.appointment import Appointment
@@ -34,10 +35,17 @@ class Patient(Base):
     telefono: Mapped[str | None] = mapped_column(String(20))
     email: Mapped[str | None] = mapped_column(String(150))
     direccion: Mapped[str | None] = mapped_column(String(255))
-    eps: Mapped[str | None] = mapped_column(String(100))
+    nit_entidad: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("cli_entidades.nit"), nullable=True
+    )
     contacto_emergencia: Mapped[str | None] = mapped_column(String(200))
     discapacidad: Mapped[bool | None] = mapped_column(Boolean)
 
     document: Mapped[Document] = relationship(back_populates="patients")
     sexo: Mapped["Sexo"] = relationship(back_populates="patients")
+    entidad: Mapped[CliEntidad | None] = relationship(lazy="joined")
     appointments: Mapped[list["Appointment"]] = relationship(back_populates="patient")
+
+    @property
+    def nom_entidad(self) -> str | None:
+        return self.entidad.nom_entidad if self.entidad else None

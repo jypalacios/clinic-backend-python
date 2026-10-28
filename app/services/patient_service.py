@@ -10,11 +10,21 @@ class PatientService:
     def __init__(self, db: Session):
         self.repo = PatientRepository(db)
 
+    def _validate_entity(self, nit: int | None, current_nit: int | None = None) -> None:
+        if nit is None:
+            return
+        entity = self.repo.get_entity(nit)
+        if entity is None:
+            raise ValueError("La entidad seleccionada no existe")
+        if not entity.activo and nit != current_nit:
+            raise ValueError("La entidad seleccionada está inactiva")
+
     def create_patient(self, data: PatientCreate) -> Patient:
         if not self.repo.get_document(data.id_documents):
             raise ValueError("El tipo de documento seleccionado no existe")
         if self.repo.get_by_identification(data.id_documents, data.ced_patients):
             raise ValueError("El número de identificación ya existe para este tipo de documento")
+        self._validate_entity(data.nit_entidad)
 
         patient = Patient(
             ced_patients=data.ced_patients,
@@ -26,7 +36,7 @@ class PatientService:
             telefono=data.telefono,
             email=data.email,
             direccion=data.direccion,
-            eps=data.eps,
+            nit_entidad=data.nit_entidad,
             contacto_emergencia=data.contacto_emergencia,
             discapacidad=data.discapacidad,
         )
@@ -42,6 +52,7 @@ class PatientService:
         existing_patient = self.repo.get_by_identification(data.id_documents, data.ced_patients)
         if existing_patient and existing_patient.id_patients != patient_id:
             raise ValueError("El número de identificación ya existe para este tipo de documento")
+        self._validate_entity(data.nit_entidad, patient.nit_entidad)
 
         patient.ced_patients = data.ced_patients
         patient.id_documents = data.id_documents
@@ -52,7 +63,7 @@ class PatientService:
         patient.telefono = data.telefono
         patient.email = data.email
         patient.direccion = data.direccion
-        patient.eps = data.eps
+        patient.nit_entidad = data.nit_entidad
         patient.contacto_emergencia = data.contacto_emergencia
         patient.discapacidad = data.discapacidad
         return self.repo.update(patient)
