@@ -57,9 +57,10 @@ class ClinicalRecordService:
             entry = ClinicalEntry(
                 id_clinics=record.id_clinic,
                 id_doctors=doctor.id_doctors,
-                **data.model_dump(exclude={"id_patients"}),
+                **data.model_dump(exclude={"id_patients", "id_cups"}),
             )
             self.repo.add(entry)
+            self._assign_cups(data.id_cups, data.id_patients, user.id)
             self._audit(user.id, "CREATE_CLINICAL_RECORD", {"id_clinic": record.id_clinic})
             self.repo.commit()
         except Exception:
@@ -90,11 +91,12 @@ class ClinicalRecordService:
             id_clinics=record_id,
             id_doctors=doctor.id_doctors,
             id_entries_rectifica=entry_id,
-            **data.model_dump(),
+            **data.model_dump(exclude={"id_cups"}),
         )
         try:
             self.repo.add(entry)
             self.repo.flush()
+            self._assign_cups(data.id_cups, record.id_patients, user.id)
             self._audit(
                 user.id,
                 "CORRECT_CLINICAL_ENTRY" if entry_id is not None else "ADD_CLINICAL_ENTRY",
@@ -111,6 +113,35 @@ class ClinicalRecordService:
         if saved is None:
             raise RuntimeError("La historia clínica actualizada no pudo recuperarse")
         return self._serialize_record(saved, include_entries=True)
+
+    def list_cups(self) -> list[dict[str, Any]]:
+        return self.repo.list_enabled_cups()
+
+    def list_patient_cups(self, patient_id: int, user: User) -> list[dict[str, Any]]:
+        role_name = user.role.nom_role.strip().casefold() if user.role else ""
+        if role_name in {"medico", "médico", "doctor"}:
+            doctor = self._current_doctor(user)
+            record = self.db.scalars(
+                select(ClinicalRecord).where(
+                    ClinicalRecord.id_patients == patient_id,
+                    ClinicalRecord.id_doctors == doctor.id_doctors,
+                )
+            ).first()
+            if not record and not self.repo.doctor_has_patient_appointment(doctor.id_doctors, patient_id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Solo puede consultar CUPS de pacientes con cita o historia asignada",
+                )
+        return self.repo.list_patient_cups(patient_id)
+
+    def _assign_cups(self, cup_ids: list[int], patient_id: int, user_id: int) -> None:
+        unique_ids = list(dict.fromkeys(cup_ids))
+        if not unique_ids:
+            return
+        valid = {cup["id_cup"] for cup in self.repo.list_enabled_cups()}
+        if any(cup_id not in valid for cup_id in unique_ids):
+            raise ValueError("Uno o más CUPS seleccionados no existen o están inactivos")
+        self.repo.assign_cups(patient_id, unique_ids, user_id)
 
     def archive_record(self, record_id: int, user: User) -> None:
         record = self.repo.get_record(record_id)

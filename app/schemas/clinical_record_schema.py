@@ -10,6 +10,7 @@ class ClinicalEntryCreate(BaseModel):
     plan: str | None = Field(default=None, max_length=20000)
     formulacion: str | None = Field(default=None, max_length=20000)
     notas: str | None = Field(default=None, max_length=20000)
+    id_cups: list[int] = Field(default_factory=list)
 
 
 class ClinicalEntryCorrection(ClinicalEntryCreate):
