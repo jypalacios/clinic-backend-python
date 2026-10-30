@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.appointment import Appointment
@@ -58,6 +58,36 @@ class ClinicalRecordRepository:
             .limit(1)
         )
         return self.db.scalar(statement) is not None
+
+    def list_enabled_cups(self) -> list[dict]:
+        return [
+            dict(row)
+            for row in self.db.execute(
+                text("SELECT id_cup, codigo, nombre FROM v_cups WHERE habilitado ORDER BY codigo")
+            ).mappings()
+        ]
+
+    def list_patient_cups(self, patient_id: int) -> list[dict]:
+        return [
+            dict(row)
+            for row in self.db.execute(
+                text(
+                    "SELECT v.id_cup_patient, v.id_cup, c.codigo, c.nombre, "
+                    "v.activo, v.fec_creacion FROM v_cli_cups_patients v "
+                    "JOIN cli_cups c ON c.id_cup = v.id_cup "
+                    "WHERE v.id_patients = :patient AND COALESCE(v.activo, true) "
+                    "ORDER BY v.fec_creacion DESC, v.id_cup_patient DESC"
+                ),
+                {"patient": patient_id},
+            ).mappings()
+        ]
+
+    def assign_cups(self, patient_id: int, cup_ids: list[int], user_id: int) -> None:
+        for cup_id in cup_ids:
+            self.db.execute(
+                text("CALL sp_insertar_cli_cups_patients(NULL::integer, :cup, :patient, true, :user)"),
+                {"cup": cup_id, "patient": patient_id, "user": user_id},
+            )
 
     def get_entry(self, entry_id: int) -> ClinicalEntry | None:
         return self.db.get(ClinicalEntry, entry_id)

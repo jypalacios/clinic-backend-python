@@ -20,6 +20,27 @@ def list_clinical_records(
     return ClinicalRecordService(db).list_records(current_user)
 
 
+@router.get("/cups")
+def list_consultation_cups(
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(
+        require_any_permission("medical_history.manage", "consultations.create", "consultations.edit")
+    ),
+):
+    return ClinicalRecordService(db).list_cups()
+
+
+@router.get("/patients/{patient_id}/cups")
+def list_patient_cups(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_any_permission("medical_history.view", "consultations.view")
+    ),
+):
+    return ClinicalRecordService(db).list_patient_cups(patient_id, current_user)
+
+
 @router.post("/", response_model=ClinicalRecordOut, status_code=status.HTTP_201_CREATED)
 def create_clinical_record(
     data: ClinicalRecordCreate,
