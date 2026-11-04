@@ -59,11 +59,23 @@ class ClinicalRecordRepository:
         )
         return self.db.scalar(statement) is not None
 
-    def list_enabled_cups(self) -> list[dict]:
+    @staticmethod
+    def _like(term: str | None) -> str | None:
+        if not term or not term.strip():
+            return None
+        escaped = term.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        return f"%{escaped}%"
+
+    def list_enabled_cups(self, term: str | None = None, limit: int | None = None) -> list[dict]:
         return [
             dict(row)
             for row in self.db.execute(
-                text("SELECT id_cup, codigo, nombre FROM v_cups WHERE habilitado ORDER BY codigo")
+                text(
+                    "SELECT id_cup, codigo, nombre FROM v_cups WHERE habilitado "
+                    "AND (CAST(:q AS text) IS NULL OR codigo ILIKE :q OR nombre ILIKE :q) "
+                    "ORDER BY codigo LIMIT :lim"
+                ),
+                {"q": self._like(term), "lim": limit},
             ).mappings()
         ]
 
@@ -88,6 +100,44 @@ class ClinicalRecordRepository:
                 text("CALL sp_insertar_cli_cups_patients(NULL::integer, :cup, :patient, true, :user)"),
                 {"cup": cup_id, "patient": patient_id, "user": user_id},
             )
+
+    def list_enabled_diagnoses(self, term: str | None = None, limit: int | None = None) -> list[dict]:
+        return [
+            dict(row)
+            for row in self.db.execute(
+                text(
+                    "SELECT id_diag, codigo, titulo FROM cli_diagnoses WHERE activo "
+                    "AND (CAST(:q AS text) IS NULL OR codigo ILIKE :q OR titulo ILIKE :q) "
+                    "ORDER BY codigo LIMIT :lim"
+                ),
+                {"q": self._like(term), "lim": limit},
+            ).mappings()
+        ]
+
+    def assign_diagnoses(self, entry_id: int, diag_ids: list[int], user_id: int) -> None:
+        for diag_id in diag_ids:
+            self.db.execute(
+                text("CALL sp_crear_cli_diag_hc(:diag, :entry, :user)"),
+                {"diag": diag_id, "entry": entry_id, "user": user_id},
+            )
+
+    def diagnoses_by_entry(self, entry_ids: list[int]) -> dict[int, list[dict]]:
+        if not entry_ids:
+            return {}
+        rows = self.db.execute(
+            text(
+                "SELECT dh.id_entries, d.id_diag, d.codigo, d.titulo AS diagnostico "
+                "FROM cli_diag_hc dh JOIN cli_diagnoses d ON d.id_diag = dh.id_diag "
+                "WHERE dh.id_entries = ANY(:ids) ORDER BY dh.id_diag_hc"
+            ),
+            {"ids": entry_ids},
+        ).mappings()
+        result: dict[int, list[dict]] = {}
+        for row in rows:
+            result.setdefault(row["id_entries"], []).append(
+                {"id_diag": row["id_diag"], "codigo": row["codigo"], "diagnostico": row["diagnostico"]}
+            )
+        return result
 
     def get_entry(self, entry_id: int) -> ClinicalEntry | None:
         return self.db.get(ClinicalEntry, entry_id)

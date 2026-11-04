@@ -57,9 +57,11 @@ class ClinicalRecordService:
             entry = ClinicalEntry(
                 id_clinics=record.id_clinic,
                 id_doctors=doctor.id_doctors,
-                **data.model_dump(exclude={"id_patients", "id_cups"}),
+                **data.model_dump(exclude={"id_patients", "id_cups", "id_diags"}),
             )
             self.repo.add(entry)
+            self.repo.flush()
+            self._assign_diagnoses(data.id_diags, entry.id_entries, user.id)
             self._assign_cups(data.id_cups, data.id_patients, user.id)
             self._audit(user.id, "CREATE_CLINICAL_RECORD", {"id_clinic": record.id_clinic})
             self.repo.commit()
@@ -91,11 +93,12 @@ class ClinicalRecordService:
             id_clinics=record_id,
             id_doctors=doctor.id_doctors,
             id_entries_rectifica=entry_id,
-            **data.model_dump(exclude={"id_cups"}),
+            **data.model_dump(exclude={"id_cups", "id_diags"}),
         )
         try:
             self.repo.add(entry)
             self.repo.flush()
+            self._assign_diagnoses(data.id_diags, entry.id_entries, user.id)
             self._assign_cups(data.id_cups, record.id_patients, user.id)
             self._audit(
                 user.id,
@@ -114,8 +117,8 @@ class ClinicalRecordService:
             raise RuntimeError("La historia clínica actualizada no pudo recuperarse")
         return self._serialize_record(saved, include_entries=True)
 
-    def list_cups(self) -> list[dict[str, Any]]:
-        return self.repo.list_enabled_cups()
+    def list_cups(self, term: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+        return self.repo.list_enabled_cups(term, limit)
 
     def list_patient_cups(self, patient_id: int, user: User) -> list[dict[str, Any]]:
         role_name = user.role.nom_role.strip().casefold() if user.role else ""
@@ -133,6 +136,18 @@ class ClinicalRecordService:
                     detail="Solo puede consultar CUPS de pacientes con cita o historia asignada",
                 )
         return self.repo.list_patient_cups(patient_id)
+
+    def list_diagnoses(self, term: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+        return self.repo.list_enabled_diagnoses(term, limit)
+
+    def _assign_diagnoses(self, diag_ids: list[int], entry_id: int, user_id: int) -> None:
+        unique_ids = list(dict.fromkeys(diag_ids))
+        if not unique_ids:
+            return
+        valid = {diag["id_diag"] for diag in self.repo.list_enabled_diagnoses()}
+        if any(diag_id not in valid for diag_id in unique_ids):
+            raise ValueError("Uno o más diagnósticos seleccionados no existen o están inactivos")
+        self.repo.assign_diagnoses(entry_id, unique_ids, user_id)
 
     def _assign_cups(self, cup_ids: list[int], patient_id: int, user_id: int) -> None:
         unique_ids = list(dict.fromkeys(cup_ids))
@@ -195,10 +210,10 @@ class ClinicalRecordService:
     def _audit(self, user_id: int, action: str, details: dict[str, int]) -> None:
         self.repo.add(AuditLog(user_id=user_id, accion=action, detalle=details))
 
-    @staticmethod
-    def _serialize_record(record: ClinicalRecord, include_entries: bool) -> dict[str, Any]:
+    def _serialize_record(self, record: ClinicalRecord, include_entries: bool) -> dict[str, Any]:
         entries = []
         if include_entries:
+            diagnoses = self.repo.diagnoses_by_entry([entry.id_entries for entry in record.entries])
             for entry in record.entries:
                 entries.append({
                     "id_entries": entry.id_entries,
@@ -209,6 +224,7 @@ class ClinicalRecordService:
                     "motivo_consulta": entry.motivo_consulta,
                     "examen_fisico": entry.examen_fisico,
                     "diagnostico": entry.diagnostico,
+                    "diagnosticos": diagnoses.get(entry.id_entries, []),
                     "plan": entry.plan,
                     "formulacion": entry.formulacion,
                     "notas": entry.notas,

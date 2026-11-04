@@ -60,7 +60,10 @@ class AppointmentService:
 
     def list_appointments(self, user: User | None = None) -> list[Appointment]:
         permissions = set(user.role.permisos if user and user.role else [])
-        if user is not None and "appointments.manage" not in permissions:
+        role_name = user.role.nom_role.strip().casefold() if user and user.role else ""
+        if user is not None and (
+            "appointments.manage" not in permissions or role_name in {"medico", "médico", "doctor"}
+        ):
             return self.repo.list_by_doctor_user(user.id)
         return self.repo.list_all()
 

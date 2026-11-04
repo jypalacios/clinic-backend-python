@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_any_permission, require_permissions, require_roles
@@ -22,12 +22,26 @@ def list_clinical_records(
 
 @router.get("/cups")
 def list_consultation_cups(
+    q: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=20, ge=1, le=50),
     db: Session = Depends(get_db),
     _current_user: User = Depends(
         require_any_permission("medical_history.manage", "consultations.create", "consultations.edit")
     ),
 ):
-    return ClinicalRecordService(db).list_cups()
+    return ClinicalRecordService(db).list_cups(q, limit)
+
+
+@router.get("/diagnoses")
+def list_consultation_diagnoses(
+    q: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(
+        require_any_permission("medical_history.manage", "consultations.create", "consultations.edit")
+    ),
+):
+    return ClinicalRecordService(db).list_diagnoses(q, limit)
 
 
 @router.get("/patients/{patient_id}/cups")
