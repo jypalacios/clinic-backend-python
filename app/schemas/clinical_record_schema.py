@@ -11,6 +11,7 @@ class ClinicalEntryCreate(BaseModel):
     formulacion: str | None = Field(default=None, max_length=20000)
     notas: str | None = Field(default=None, max_length=20000)
     id_cups: list[int] = Field(default_factory=list)
+    id_diags: list[int] = Field(default_factory=list)
 
 
 class ClinicalEntryCorrection(ClinicalEntryCreate):
@@ -36,6 +37,12 @@ class ClinicalDoctorOut(BaseModel):
     ape_doctors: str
 
 
+class ClinicalEntryDiagnosisOut(BaseModel):
+    id_diag: int
+    codigo: str
+    diagnostico: str
+
+
 class ClinicalEntryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,7 +58,7 @@ class ClinicalEntryOut(BaseModel):
     formulacion: str | None
     notas: str | None
     medico: str
-
+    diagnosticos: list[ClinicalEntryDiagnosisOut] = Field(default_factory=list)
 
 class ClinicalRecordOut(BaseModel):
     id_clinic: int
