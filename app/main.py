@@ -15,7 +15,7 @@ from app.models.role import Role
 from app.models.sexo import Sexo
 from app.models.specialty import Specialty
 from app.models.user import User
-from app.api.v1 import allergies, appointments, auth, clinical_records, cups, doctors, documents, entities, health, patients, roles, sexos, specialties, users
+from app.api.v1 import allergies, appointments, auth, clinical_records, cups, diagnoses, doctors, documents, entities, health, patients, roles, sexos, specialties, users
 
 settings = get_settings()
 PATIENT_DOCUMENTS_MIGRATION = "20261008_patient_documents"
@@ -23,6 +23,7 @@ PATIENT_AGE_MIGRATION = "20261009_patient_age"
 CONSULTATIONS_PERMISSIONS_MIGRATION = "20261023_consultations_permissions"
 ENTITIES_PERMISSIONS_MIGRATION = "20261027_entities_permissions"
 CUPS_PERMISSIONS_MIGRATION = "20261029_cups_permissions"
+DIAGNOSES_PERMISSIONS_MIGRATION = "20261104_diagnoses_permissions"
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.APP_VERSION)
 
@@ -49,6 +50,7 @@ app.include_router(allergies.types_router, prefix=settings.API_V1_PREFIX)
 app.include_router(allergies.router, prefix=settings.API_V1_PREFIX)
 app.include_router(entities.router, prefix=settings.API_V1_PREFIX)
 app.include_router(cups.router, prefix=settings.API_V1_PREFIX)
+app.include_router(diagnoses.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.on_event("startup")
@@ -208,6 +210,33 @@ def verificar_conexion_bd() -> None:
                 {"version": CUPS_PERMISSIONS_MIGRATION},
             )
 
+        diagnoses_permissions_applied = conn.execute(
+            text("SELECT 1 FROM app_schema_migrations WHERE version = :version"),
+            {"version": DIAGNOSES_PERMISSIONS_MIGRATION},
+        ).first()
+        if not diagnoses_permissions_applied:
+            conn.execute(
+                text(
+                    "INSERT INTO permisos (nom_permiso) VALUES "
+                    "('diagnoses.view'), ('diagnoses.manage') "
+                    "ON CONFLICT (nom_permiso) DO NOTHING"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO matriz_permisos (id_role, id_permiso, activo) "
+                    "SELECT r.id_role, p.id_permiso, TRUE "
+                    "FROM roles r "
+                    "JOIN permisos p ON p.nom_permiso IN ('diagnoses.view', 'diagnoses.manage') "
+                    "WHERE upper(trim(r.nom_role)) = 'ADMINISTRADOR' "
+                    "ON CONFLICT (id_role, id_permiso) DO NOTHING"
+                )
+            )
+            conn.execute(
+                text("INSERT INTO app_schema_migrations (version) VALUES (:version)"),
+                {"version": DIAGNOSES_PERMISSIONS_MIGRATION},
+            )
+
         conn.execute(text("DROP VIEW IF EXISTS v_permisos"))
         conn.execute(
             text(
@@ -312,6 +341,8 @@ def verificar_conexion_bd() -> None:
                 "WHEN 'entities.manage' THEN 'Crear y editar entidades' "
                 "WHEN 'cups.view' THEN 'Consultar CUPS' "
                 "WHEN 'cups.manage' THEN 'Crear y editar CUPS' "
+                "WHEN 'diagnoses.view' THEN 'Consultar diagnósticos' "
+                "WHEN 'diagnoses.manage' THEN 'Crear y editar diagnósticos' "
                 "ELSE nom_permiso END AS etiqueta, "
                 "CASE WHEN permiso_key LIKE 'users.%' THEN 'Usuarios' "
                 "WHEN permiso_key = 'roles.manage' THEN 'Roles y permisos' "
@@ -329,6 +360,7 @@ def verificar_conexion_bd() -> None:
                 "WHEN permiso_key LIKE 'allergies.%' THEN 'Alergias' "
                 "WHEN permiso_key LIKE 'entities.%' THEN 'Entidades' "
                 "WHEN permiso_key LIKE 'cups.%' THEN 'CUPS' "
+                "WHEN permiso_key LIKE 'diagnoses.%' THEN 'Diagnósticos' "
                 "ELSE 'Otros permisos' END AS nom_grupo "
                 "FROM normalized_permissions"
             )

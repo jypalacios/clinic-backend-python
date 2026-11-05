@@ -44,6 +44,16 @@ def list_consultation_diagnoses(
     return ClinicalRecordService(db).list_diagnoses(q, limit)
 
 
+@router.get("/measure-types")
+def list_measure_types(
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(
+        require_any_permission("medical_history.manage", "consultations.create", "consultations.edit")
+    ),
+):
+    return ClinicalRecordService(db).list_measure_types()
+
+
 @router.get("/patients/{patient_id}/cups")
 def list_patient_cups(
     patient_id: int,

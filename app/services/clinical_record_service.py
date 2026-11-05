@@ -54,14 +54,14 @@ class ClinicalRecordService:
         try:
             self.repo.add(record)
             self.repo.flush()
-            entry = ClinicalEntry(
-                id_clinics=record.id_clinic,
-                id_doctors=doctor.id_doctors,
-                **data.model_dump(exclude={"id_patients", "id_cups", "id_diags"}),
+            entry_id_new = self.repo.insert_entry(
+                record.id_clinic,
+                doctor.id_doctors,
+                None,
+                data.model_dump(exclude={"id_patients", "id_cups", "id_diags"}),
+                user.id,
             )
-            self.repo.add(entry)
-            self.repo.flush()
-            self._assign_diagnoses(data.id_diags, entry.id_entries, user.id)
+            self._assign_diagnoses(data.id_diags, entry_id_new, user.id)
             self._assign_cups(data.id_cups, data.id_patients, user.id)
             self._audit(user.id, "CREATE_CLINICAL_RECORD", {"id_clinic": record.id_clinic})
             self.repo.commit()
@@ -89,21 +89,20 @@ class ClinicalRecordService:
             if not original or original.id_clinics != record_id:
                 raise ValueError("La nota que intenta rectificar no pertenece a esta historia")
 
-        entry = ClinicalEntry(
-            id_clinics=record_id,
-            id_doctors=doctor.id_doctors,
-            id_entries_rectifica=entry_id,
-            **data.model_dump(exclude={"id_cups", "id_diags"}),
-        )
         try:
-            self.repo.add(entry)
-            self.repo.flush()
-            self._assign_diagnoses(data.id_diags, entry.id_entries, user.id)
+            new_entry_id = self.repo.insert_entry(
+                record_id,
+                doctor.id_doctors,
+                entry_id,
+                data.model_dump(exclude={"id_cups", "id_diags"}),
+                user.id,
+            )
+            self._assign_diagnoses(data.id_diags, new_entry_id, user.id)
             self._assign_cups(data.id_cups, record.id_patients, user.id)
             self._audit(
                 user.id,
                 "CORRECT_CLINICAL_ENTRY" if entry_id is not None else "ADD_CLINICAL_ENTRY",
-                {"id_clinic": record_id, "id_entries": entry.id_entries, **(
+                {"id_clinic": record_id, "id_entries": new_entry_id, **(
                     {"id_entries_rectifica": entry_id} if entry_id is not None else {}
                 )},
             )
@@ -139,6 +138,9 @@ class ClinicalRecordService:
 
     def list_diagnoses(self, term: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
         return self.repo.list_enabled_diagnoses(term, limit)
+
+    def list_measure_types(self) -> list[dict[str, Any]]:
+        return self.repo.list_measure_types()
 
     def _assign_diagnoses(self, diag_ids: list[int], entry_id: int, user_id: int) -> None:
         unique_ids = list(dict.fromkeys(diag_ids))
@@ -214,8 +216,11 @@ class ClinicalRecordService:
         entries = []
         if include_entries:
             diagnoses = self.repo.diagnoses_by_entry([entry.id_entries for entry in record.entries])
+            measures = self.repo.measures_by_entry([entry.id_entries for entry in record.entries])
             for entry in record.entries:
+                measure = measures.get(entry.id_entries, [])
                 entries.append({
+                    "medidas": measure,
                     "id_entries": entry.id_entries,
                     "id_clinics": entry.id_clinics,
                     "id_doctors": entry.id_doctors,
@@ -228,6 +233,8 @@ class ClinicalRecordService:
                     "plan": entry.plan,
                     "formulacion": entry.formulacion,
                     "notas": entry.notas,
+                    "peso": entry.peso,
+                    "talle": entry.talle,
                     "medico": f"{entry.doctor.nom_doctors} {entry.doctor.ape_doctors}".strip(),
                 })
         return {
