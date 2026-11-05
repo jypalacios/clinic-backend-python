@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -48,6 +48,8 @@ class ClinicalEntry(Base):
     plan: Mapped[str | None] = mapped_column(Text)
     formulacion: Mapped[str | None] = mapped_column(Text)
     notas: Mapped[str | None] = mapped_column(Text)
+    peso: Mapped[float | None] = mapped_column(Float)
+    talle: Mapped[float | None] = mapped_column(Float)
 
     record: Mapped[ClinicalRecord] = relationship(back_populates="entries")
     doctor: Mapped["Doctor"] = relationship()

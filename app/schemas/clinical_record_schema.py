@@ -3,6 +3,18 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ClinicalMeasureIn(BaseModel):
+    id_hc_detalle: int
+    derecho: str | None = Field(default=None, max_length=20)
+    izquierdo: str | None = Field(default=None, max_length=20)
+
+
+class ClinicalMeasureOut(ClinicalMeasureIn):
+    id_hc_medida: int
+    detalle_medida: str | None = None
+    general: str | None = None
+
+
 class ClinicalEntryCreate(BaseModel):
     motivo_consulta: str = Field(min_length=1, max_length=10000)
     examen_fisico: str | None = Field(default=None, max_length=20000)
@@ -10,9 +22,11 @@ class ClinicalEntryCreate(BaseModel):
     plan: str | None = Field(default=None, max_length=20000)
     formulacion: str | None = Field(default=None, max_length=20000)
     notas: str | None = Field(default=None, max_length=20000)
+    peso: float | None = Field(default=None, gt=0, le=1000)
+    talle: float | None = Field(default=None, gt=0, le=300)
     id_cups: list[int] = Field(default_factory=list)
     id_diags: list[int] = Field(default_factory=list)
-
+    medidas: list[ClinicalMeasureIn] = Field(default_factory=list)
 
 class ClinicalEntryCorrection(ClinicalEntryCreate):
     id_entries_rectifica: int
@@ -57,6 +71,9 @@ class ClinicalEntryOut(BaseModel):
     plan: str | None
     formulacion: str | None
     notas: str | None
+    peso: float | None = None
+    talle: float | None = None
+    medidas: list[ClinicalMeasureOut] = Field(default_factory=list)
     medico: str
     diagnosticos: list[ClinicalEntryDiagnosisOut] = Field(default_factory=list)
 
