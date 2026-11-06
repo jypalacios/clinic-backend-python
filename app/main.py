@@ -24,6 +24,7 @@ CONSULTATIONS_PERMISSIONS_MIGRATION = "20261023_consultations_permissions"
 ENTITIES_PERMISSIONS_MIGRATION = "20261027_entities_permissions"
 CUPS_PERMISSIONS_MIGRATION = "20261029_cups_permissions"
 DIAGNOSES_PERMISSIONS_MIGRATION = "20261104_diagnoses_permissions"
+DOCTOR_USER_LINK_PERMISSION_MIGRATION = "20261105_doctor_user_link_permission"
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.APP_VERSION)
 
@@ -98,6 +99,33 @@ def verificar_conexion_bd() -> None:
                     "ALTER TABLE matriz_permisos ALTER COLUMN activo SET DEFAULT TRUE, "
                     "ALTER COLUMN activo SET NOT NULL"
                 )
+            )
+
+        doctor_user_link_permission_applied = conn.execute(
+            text("SELECT 1 FROM app_schema_migrations WHERE version = :version"),
+            {"version": DOCTOR_USER_LINK_PERMISSION_MIGRATION},
+        ).first()
+        if not doctor_user_link_permission_applied:
+            conn.execute(
+                text(
+                    "INSERT INTO permisos (nom_permiso, activo) "
+                    "VALUES ('doctors.link_user', TRUE) "
+                    "ON CONFLICT (nom_permiso) DO UPDATE SET activo = TRUE"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO matriz_permisos (id_role, id_permiso, activo) "
+                    "SELECT r.id_role, p.id_permiso, TRUE "
+                    "FROM roles r "
+                    "JOIN permisos p ON p.nom_permiso = 'doctors.link_user' "
+                    "WHERE upper(trim(r.nom_role)) IN ('ADMINISTRADOR', 'ADMIN') "
+                    "ON CONFLICT (id_role, id_permiso) DO UPDATE SET activo = TRUE"
+                )
+            )
+            conn.execute(
+                text("INSERT INTO app_schema_migrations (version) VALUES (:version)"),
+                {"version": DOCTOR_USER_LINK_PERMISSION_MIGRATION},
             )
 
         consultations_permissions_applied = conn.execute(
