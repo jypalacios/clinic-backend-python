@@ -20,6 +20,7 @@ class Appointment(Base):
         ForeignKey("patients.id_patients"), nullable=False
     )
     id_doctors: Mapped[int] = mapped_column(ForeignKey("doctors.id_doctors"), nullable=False)
+    tipo_appointment: Mapped[int | None] = mapped_column(Integer)
     fecha_hora: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     id_estado: Mapped[int] = mapped_column(ForeignKey("estados.id_estado"), nullable=False)
     usu_creacion: Mapped[int | None] = mapped_column(ForeignKey("users.id"))

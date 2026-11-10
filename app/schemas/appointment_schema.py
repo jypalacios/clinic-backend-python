@@ -2,7 +2,7 @@ from datetime import datetime
 
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class AppointmentTimeMixin(BaseModel):
@@ -17,6 +17,7 @@ class AppointmentTimeMixin(BaseModel):
 class AppointmentCreate(AppointmentTimeMixin):
     id_patients: int
     id_doctors: int
+    tipo_appointment: int = Field(gt=0)
     fecha_hora: datetime
     estado: Literal["PROGRAMADA"] = "PROGRAMADA"
 
@@ -24,6 +25,7 @@ class AppointmentCreate(AppointmentTimeMixin):
 class AppointmentUpdate(AppointmentTimeMixin):
     id_doctors: int
     fecha_hora: datetime
+    tipo_appointment: int | None = Field(default=None, gt=0)
     estado: str | None = None
 
 
@@ -51,6 +53,7 @@ class AppointmentOut(BaseModel):
     id_appointments: int
     id_patients: int
     id_doctors: int
+    tipo_appointment: int | None = None
     fecha_hora: datetime
     nom_estado: str
     paciente: str | None = None
@@ -64,3 +67,8 @@ class AppointmentOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AppointmentTypeOut(BaseModel):
+    id_tipo_appointment: int
+    nom_tipo_appointment: str

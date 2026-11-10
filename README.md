@@ -106,6 +106,16 @@ tener la extensión instalada, `pg_cron` habilitado en `shared_preload_libraries
 
 ## Principales módulos de negocio
 
+### Citas
+- `GET /api/v1/appointments/types` lista los tipos configurados y requiere `appointments.view`.
+- La creación de una cita requiere `tipo_appointment`; el tipo debe existir en `cli_tipo_appointment`. La reprogramación permite actualizarlo.
+
+### Análisis
+- La página Management permite asociar detalles de historia clínica a tipos de cita.
+- `GET /api/v1/analysis/types`, `/details` y `/assignments?type_id=...` requieren `analysis.view`.
+- `POST /api/v1/analysis/assignments` y `PUT /api/v1/analysis/assignments/{id}` requieren `analysis.manage`. El usuario autenticado se registra como creador o modificador.
+- Requiere las vistas `v_cli_tipo_appointment` y `v_cli_hc_appointment`, las tablas de detalle de historia clínica y los procedimientos `sp_crear_cli_hc_appointment` y `sp_actualizar_cli_hc_appointment` instalados en PostgreSQL. Los permisos se asignan inicialmente al rol `ADMINISTRADOR`.
+
 ### Autenticación
 - login con email y contraseña
 - generación de token JWT
