@@ -32,6 +32,8 @@ Permission = Literal[
     "entities.manage",
     "cups.view",
     "cups.manage",
+    "analysis.view",
+    "analysis.manage",
 ]
 
 LEGACY_PERMISSION_KEYS: dict[str, str] = {

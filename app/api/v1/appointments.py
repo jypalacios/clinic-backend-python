@@ -8,6 +8,7 @@ from app.schemas.appointment_schema import (
     AppointmentCreate,
     AppointmentIngresoUpdate,
     AppointmentOut,
+    AppointmentTypeOut,
     AppointmentUpdate,
 )
 from app.services.appointment_service import AppointmentService
@@ -22,6 +23,14 @@ def list_appointments(
 ):
     service = AppointmentService(db)
     return service.list_appointments(current_user)
+
+
+@router.get("/types", response_model=list[AppointmentTypeOut])
+def list_appointment_types(
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_permissions("appointments.view")),
+):
+    return AppointmentService(db).list_types()
 
 
 @router.post("/", response_model=AppointmentOut, status_code=status.HTTP_201_CREATED)

@@ -35,7 +35,11 @@ class AppointmentService:
         found = {state.nom_estado for state in self.repo.list_appointment_states(APPOINTMENT_STATES)}
         return [name for name in APPOINTMENT_STATES if name in found]
 
+    def list_types(self) -> list[dict[str, int | str]]:
+        return self.repo.list_appointment_types()
+
     def create_appointment(self, data: AppointmentCreate, user: User) -> Appointment:
+        self._validate_appointment_type(data.tipo_appointment)
         self._validate_schedule(data.id_patients, data.id_doctors, data.fecha_hora)
         state = self.repo.get_state_by_name(data.estado)
         if state is None:
@@ -43,6 +47,7 @@ class AppointmentService:
         appointment = Appointment(
             id_patients=data.id_patients,
             id_doctors=data.id_doctors,
+            tipo_appointment=data.tipo_appointment,
             fecha_hora=data.fecha_hora,
             id_estado=state.id_estado,
             usu_creacion=user.id,
@@ -79,6 +84,8 @@ class AppointmentService:
         appointment = self.repo.get_by_id(appointment_id)
         if not appointment:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada")
+        if data.tipo_appointment is not None:
+            self._validate_appointment_type(data.tipo_appointment)
         if appointment.nom_estado in INACTIVE_STATES and (
             data.estado is None or data.estado == appointment.nom_estado
         ):
@@ -97,6 +104,8 @@ class AppointmentService:
                 exclude_appointment_id=appointment_id,
             )
         appointment.id_doctors = data.id_doctors
+        if data.tipo_appointment is not None:
+            appointment.tipo_appointment = data.tipo_appointment
         appointment.fecha_hora = data.fecha_hora
         appointment.id_estado = state.id_estado
         appointment.state = state
@@ -183,6 +192,10 @@ class AppointmentService:
             raise ValueError("La fecha y hora de la cita deben ser futuras")
         if self.repo.has_schedule_conflict(doctor_id, fecha_hora, exclude_appointment_id):
             raise ValueError("El médico ya tiene una cita activa en esa fecha y hora")
+
+    def _validate_appointment_type(self, type_id: int) -> None:
+        if not self.repo.appointment_type_exists(type_id):
+            raise ValueError("El tipo de cita seleccionado no existe")
 
     def _commit(self, appointment: Appointment) -> Appointment:
         try:

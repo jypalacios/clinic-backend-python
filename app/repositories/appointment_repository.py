@@ -60,6 +60,29 @@ class AppointmentRepository:
             )
         )
 
+    def list_appointment_types(self) -> list[dict[str, int | str]]:
+        return [
+            dict(row)
+            for row in self.db.execute(
+                text(
+                    "SELECT id_tipo_appointment, trim(nom_tipo_appointment) AS nom_tipo_appointment "
+                    "FROM cli_tipo_appointment ORDER BY nom_tipo_appointment, id_tipo_appointment"
+                )
+            ).mappings()
+        ]
+
+    def appointment_type_exists(self, type_id: int) -> bool:
+        return bool(
+            self.db.scalar(
+                text(
+                    "SELECT EXISTS ("
+                    "SELECT 1 FROM cli_tipo_appointment WHERE id_tipo_appointment = :type_id"
+                    ")"
+                ),
+                {"type_id": type_id},
+            )
+        )
+
     def has_schedule_conflict(
         self,
         doctor_id: int,
