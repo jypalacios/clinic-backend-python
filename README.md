@@ -194,6 +194,7 @@ Para instalar o actualizar los procedimientos almacenados, ejecute `02_procedimi
 - Para médicos, `GET /api/v1/patients/` se limita a sus pacientes con citas no canceladas ni marcadas como inasistencia.
 - `POST /api/v1/clinical-records/{record_id}/entries` agrega una evolución con `consultations.create` o `medical_history.manage`.
 - `PUT /api/v1/clinical-records/{record_id}/entries/{entry_id}` registra una rectificación inmutable con `consultations.edit` o `medical_history.manage`.
+- `GET /api/v1/allergy-types/` permite consultar tipos de alergia con permisos de lectura de alergias o `consultations.create`; `POST /api/v1/allergies/` permite asociarlas con `allergies.manage` o `consultations.create` (este último solo para pacientes con cita asignada al médico).
 - `DELETE /api/v1/clinical-records/{record_id}` archiva la historia (permiso exclusivo de administración).
 - `PUT /api/v1/clinical-records/{record_id}/restore` restaura una historia archivada (permiso exclusivo de administración).
 - `PUT /api/v1/doctors/{doctor_id}/user` vincula una cuenta con rol médico a su perfil profesional.

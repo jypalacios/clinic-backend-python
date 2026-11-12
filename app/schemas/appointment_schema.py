@@ -72,3 +72,5 @@ class AppointmentOut(BaseModel):
 class AppointmentTypeOut(BaseModel):
     id_tipo_appointment: int
     nom_tipo_appointment: str
+    logo: str | None = None
+    path: str | None = None

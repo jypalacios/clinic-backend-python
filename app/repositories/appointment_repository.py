@@ -65,7 +65,8 @@ class AppointmentRepository:
             dict(row)
             for row in self.db.execute(
                 text(
-                    "SELECT id_tipo_appointment, trim(nom_tipo_appointment) AS nom_tipo_appointment "
+                    "SELECT id_tipo_appointment, trim(nom_tipo_appointment) AS nom_tipo_appointment, "
+                    "replace(encode(logo, 'base64'), E'\\n', '') AS logo, path "
                     "FROM cli_tipo_appointment ORDER BY nom_tipo_appointment, id_tipo_appointment"
                 )
             ).mappings()
