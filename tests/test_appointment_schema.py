@@ -9,7 +9,7 @@ from app.models.patient import Patient as _Patient
 from app.models.sexo import Sexo as _Sexo
 from app.models.specialty import Specialty as _Specialty
 from app.models.state import State
-from app.schemas.appointment_schema import AppointmentCreate, AppointmentOut
+from app.schemas.appointment_schema import AppointmentCreate, AppointmentOut, AppointmentTypeOut
 
 
 class AppointmentSchemaTests(unittest.TestCase):
@@ -49,6 +49,19 @@ class AppointmentSchemaTests(unittest.TestCase):
 
         result = AppointmentCreate.model_validate({**appointment_data, "tipo_appointment": 5})
         self.assertEqual(result.tipo_appointment, 5)
+
+    def test_appointment_type_output_includes_logo_and_path(self):
+        result = AppointmentTypeOut.model_validate(
+            {
+                "id_tipo_appointment": 5,
+                "nom_tipo_appointment": "Consulta",
+                "logo": "aGVsbG8=",
+                "path": "/assets/consulta.png",
+            }
+        )
+
+        self.assertEqual(result.logo, "aGVsbG8=")
+        self.assertEqual(result.path, "/assets/consulta.png")
 
 
 if __name__ == "__main__":

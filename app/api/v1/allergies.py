@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import require_any_permission, require_permissions
 from app.db.session import get_db
 from app.models.user import User
+from app.repositories.patient_repository import PatientRepository
 from app.schemas.allergy_schema import (
     AllergyCreate,
     AllergyOut,
@@ -34,7 +35,12 @@ def _http_error(exc: Exception) -> HTTPException:
 def list_allergy_types(
     db: Session = Depends(get_db),
     _current_user: User = Depends(
-        require_any_permission("allergy_types.view", "allergies.view", "allergies.manage")
+        require_any_permission(
+            "allergy_types.view",
+            "allergies.view",
+            "allergies.manage",
+            "consultations.create",
+        )
     ),
 ):
     return AllergyService(db).list_types()
@@ -82,8 +88,19 @@ def list_allergies(
 def create_allergy(
     data: AllergyCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permissions("allergies.manage")),
+    current_user: User = Depends(
+        require_any_permission("allergies.manage", "consultations.create")
+    ),
 ):
+    permissions = set(current_user.role.permisos if current_user.role else [])
+    if "allergies.manage" not in permissions and not PatientRepository(db).is_assigned_to_doctor(
+        data.id_patients,
+        current_user.id,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo puede registrar alergias para pacientes con una cita asignada",
+        )
     try:
         return AllergyService(db).create_allergy(data, current_user.id)
     except (LookupError, ValueError) as exc:
