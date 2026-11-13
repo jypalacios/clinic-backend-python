@@ -47,11 +47,20 @@ def list_consultation_diagnoses(
 @router.get("/measure-types")
 def list_measure_types(
     db: Session = Depends(get_db),
-    _current_user: User = Depends(
+    current_user: User = Depends(
         require_any_permission("medical_history.manage", "consultations.create", "consultations.edit")
     ),
 ):
-    return ClinicalRecordService(db).list_measure_types()
+    return ClinicalRecordService(db).list_measure_types(current_user)
+
+@router.get("/measure-config")
+def get_measure_config(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_any_permission("medical_history.manage", "consultations.create", "consultations.edit")
+    ),
+):
+    return ClinicalRecordService(db).measure_config(current_user)
 
 
 @router.get("/patients/{patient_id}/cups")

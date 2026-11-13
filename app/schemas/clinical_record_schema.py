@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -7,12 +8,15 @@ class ClinicalMeasureIn(BaseModel):
     id_hc_detalle: int
     derecho: str | None = Field(default=None, max_length=20)
     izquierdo: str | None = Field(default=None, max_length=20)
+    detalle: str | None = Field(default=None, max_length=255)
 
 
 class ClinicalMeasureOut(ClinicalMeasureIn):
     id_hc_medida: int
     detalle_medida: str | None = None
     general: str | None = None
+    det_derecho: str | None = None
+    det_izquierdo: str | None = None
 
 
 class ClinicalEntryCreate(BaseModel):
@@ -75,6 +79,8 @@ class ClinicalEntryOut(BaseModel):
     talle: float | None = None
     medidas: list[ClinicalMeasureOut] = Field(default_factory=list)
     medico: str
+    nom_espect: str
+    measure_mode: Literal["detalle", "ojos"]
     diagnosticos: list[ClinicalEntryDiagnosisOut] = Field(default_factory=list)
 
 class ClinicalRecordOut(BaseModel):

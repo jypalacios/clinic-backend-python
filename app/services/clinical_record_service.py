@@ -1,4 +1,5 @@
 from typing import Any
+from unicodedata import combining, normalize
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -50,6 +51,7 @@ class ClinicalRecordService:
                 raise ValueError("El paciente ya tiene una historia clínica")
             raise ValueError("La historia está archivada; solicite al administrador que la restaure")
 
+        self._validate_measures(data, doctor)
         record = ClinicalRecord(id_patients=data.id_patients, id_doctors=doctor.id_doctors)
         try:
             self.repo.add(record)
@@ -89,6 +91,7 @@ class ClinicalRecordService:
             if not original or original.id_clinics != record_id:
                 raise ValueError("La nota que intenta rectificar no pertenece a esta historia")
 
+        self._validate_measures(data, doctor)
         try:
             new_entry_id = self.repo.insert_entry(
                 record_id,
@@ -139,8 +142,31 @@ class ClinicalRecordService:
     def list_diagnoses(self, term: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
         return self.repo.list_enabled_diagnoses(term, limit)
 
-    def list_measure_types(self) -> list[dict[str, Any]]:
-        return self.repo.list_measure_types()
+    def list_measure_types(self, user: User) -> list[dict[str, Any]]:
+        return self.repo.list_measure_types(self._current_doctor(user).id_espect)
+
+    @staticmethod
+    def _measure_mode(specialty_name: str) -> str:
+        name = "".join(char for char in normalize("NFD", specialty_name.strip().casefold()) if not combining(char))
+        return "detalle" if name in {"neurologia", "neurologo", "neurologa"} else "ojos"
+
+    def measure_config(self, user: User) -> dict[str, Any]:
+        doctor = self._current_doctor(user)
+        return {
+            "mode": self._measure_mode(doctor.specialty.nom_espect),
+            "types": self.repo.list_measure_types(doctor.id_espect),
+        }
+
+    def _validate_measures(self, data: ClinicalEntryCreate, doctor: Doctor) -> None:
+        if not data.medidas:
+            return
+        valid = {item["id_hc_detalle"] for item in self.repo.list_measure_types(doctor.id_espect)}
+        if any(measure.id_hc_detalle not in valid for measure in data.medidas):
+            raise ValueError("Una o más medidas no corresponden a la especialidad del médico")
+        if self._measure_mode(doctor.specialty.nom_espect) == "detalle" and any(
+            measure.derecho or measure.izquierdo for measure in data.medidas
+        ):
+            raise ValueError("Las medidas de neurología deben registrarse en el campo detalle, no en los campos de ojos")
 
     def _assign_diagnoses(self, diag_ids: list[int], entry_id: int, user_id: int) -> None:
         unique_ids = list(dict.fromkeys(diag_ids))
@@ -215,27 +241,18 @@ class ClinicalRecordService:
     def _serialize_record(self, record: ClinicalRecord, include_entries: bool) -> dict[str, Any]:
         entries = []
         if include_entries:
-            diagnoses = self.repo.diagnoses_by_entry([entry.id_entries for entry in record.entries])
-            measures = self.repo.measures_by_entry([entry.id_entries for entry in record.entries])
+            entry_ids = [entry.id_entries for entry in record.entries]
+            entry_data = self.repo.entries_by_id(entry_ids)
+            diagnoses = self.repo.diagnoses_by_entry(entry_ids)
+            measures = self.repo.measures_by_entry(entry_ids)
             for entry in record.entries:
-                measure = measures.get(entry.id_entries, [])
+                if entry.id_entries not in entry_data:
+                    raise RuntimeError(f"La nota clínica {entry.id_entries} no se encuentra en v_clinical_entries")
                 entries.append({
-                    "medidas": measure,
-                    "id_entries": entry.id_entries,
-                    "id_clinics": entry.id_clinics,
-                    "id_doctors": entry.id_doctors,
-                    "id_entries_rectifica": entry.id_entries_rectifica,
-                    "fec_entrada": entry.fec_entrada,
-                    "motivo_consulta": entry.motivo_consulta,
-                    "examen_fisico": entry.examen_fisico,
-                    "diagnostico": entry.diagnostico,
+                    **entry_data[entry.id_entries],
+                    "measure_mode": self._measure_mode(entry_data[entry.id_entries]["nom_espect"]),
+                    "medidas": measures.get(entry.id_entries, []),
                     "diagnosticos": diagnoses.get(entry.id_entries, []),
-                    "plan": entry.plan,
-                    "formulacion": entry.formulacion,
-                    "notas": entry.notas,
-                    "peso": entry.peso,
-                    "talle": entry.talle,
-                    "medico": f"{entry.doctor.nom_doctors} {entry.doctor.ape_doctors}".strip(),
                 })
         return {
             "id_clinic": record.id_clinic,
