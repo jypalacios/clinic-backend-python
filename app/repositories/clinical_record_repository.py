@@ -139,17 +139,34 @@ class ClinicalRecordRepository:
             )
         return result
 
+    def entries_by_id(self, entry_ids: list[int]) -> dict[int, dict]:
+        if not entry_ids:
+            return {}
+        rows = self.db.execute(
+            text(
+                "SELECT DISTINCT id_entries, id_clinics, id_doctors, id_entries_rectifica, "
+                "fec_entrada, motivo_consulta, examen_fisico, diagnostico_texto AS diagnostico, "
+                "plan, formulacion, notas, peso, talle, medico, trim(nom_espect) AS nom_espect "
+                "FROM v_clinical_entries WHERE id_entries = ANY(:ids)"
+            ),
+            {"ids": entry_ids},
+        ).mappings()
+        return {row["id_entries"]: dict(row) for row in rows}
+
     def get_entry(self, entry_id: int) -> ClinicalEntry | None:
         return self.db.get(ClinicalEntry, entry_id)
 
     def insert_entry(self, record_id: int, doctor_id: int, rectifies: int | None, data: dict, user_id: int) -> int:
-        measures = [m for m in data.get("medidas") or [] if m.get("derecho") or m.get("izquierdo")]
+        measures = [
+            m for m in data.get("medidas") or []
+            if m.get("derecho") or m.get("izquierdo") or m.get("detalle")
+        ]
         first = measures[0] if measures else None
         entry_id = self.db.execute(
             text(
                 "CALL sp_insertar_clinical_entry(NULL::bigint, :record, :doctor, :motivo, :examen, "
                 ":diag, :plan, :formulacion, :notas, :usuario, NULL::inet, :peso, :talle, "
-                ":detalle, :derecho, :izquierdo, :rectifica)"
+                ":detalle_id, :derecho, :izquierdo, :rectifica, NULL::text, NULL::text, :detalle)"
             ),
             {
                 "record": record_id,
@@ -163,28 +180,31 @@ class ClinicalRecordRepository:
                 "usuario": user_id,
                 "peso": data.get("peso"),
                 "talle": data.get("talle"),
-                "detalle": first["id_hc_detalle"] if first else None,
+                "detalle_id": first["id_hc_detalle"] if first else None,
                 "derecho": first.get("derecho") if first else None,
                 "izquierdo": first.get("izquierdo") if first else None,
+                "detalle": first.get("detalle") if first else None,
                 "rectifica": rectifies,
             },
         ).scalar_one()
         for extra in measures[1:]:
             self.db.execute(
                 text(
-                    "INSERT INTO cli_hc_medida (id_hc_detalle, derecho, izquierdo, id_entries) "
-                    "VALUES (:detalle, :derecho, :izquierdo, :entry)"
+                    "INSERT INTO cli_hc_medida (id_hc_detalle, derecho, izquierdo, id_entries, detalle) "
+                    "VALUES (:detalle_id, :derecho, :izquierdo, :entry, :detalle)"
                 ),
                 {
-                    "detalle": extra["id_hc_detalle"],
+                    "detalle_id": extra["id_hc_detalle"],
                     "derecho": extra.get("derecho"),
                     "izquierdo": extra.get("izquierdo"),
+                    "detalle": extra.get("detalle"),
                     "entry": entry_id,
                 },
             )
         return entry_id
 
-    def list_measure_types(self) -> list[dict]:
+    def list_measure_types(self, specialty_id: int | None = None) -> list[dict]:
+        specialty_filter = "WHERE g.id_espect = :specialty_id " if specialty_id is not None else ""
         return [
             dict(row)
             for row in self.db.execute(
@@ -192,8 +212,10 @@ class ClinicalRecordRepository:
                     "SELECT d.id_hc_detalle, d.id_hc_general, trim(d.det_hc_general) AS detalle, "
                     "trim(g.det_hcgeneral) AS general FROM cli_hc_detalle d "
                     "JOIN cli_hc_general g ON g.id_hcgeneral = d.id_hc_general "
+                    f"{specialty_filter}"
                     "ORDER BY g.det_hcgeneral, d.det_hc_general"
-                )
+                ),
+                {"specialty_id": specialty_id},
             ).mappings()
         ]
 
@@ -202,12 +224,13 @@ class ClinicalRecordRepository:
             return {}
         rows = self.db.execute(
             text(
-                "SELECT m.id_entries, m.id_hc_medida, m.id_hc_detalle, trim(d.det_hc_general) AS detalle_medida, "
-                "trim(g.det_hcgeneral) AS general, trim(m.derecho) AS derecho, trim(m.izquierdo) AS izquierdo "
-                "FROM cli_hc_medida m "
-                "JOIN cli_hc_detalle d ON d.id_hc_detalle = m.id_hc_detalle "
-                "JOIN cli_hc_general g ON g.id_hcgeneral = d.id_hc_general "
-                "WHERE m.id_entries = ANY(:ids) ORDER BY m.id_hc_medida"
+                "SELECT DISTINCT id_entries, id_hc_medida, id_hc_detalle, "
+                "trim(detalle_medida) AS detalle_medida, trim(det_hcgeneral) AS general, "
+                "trim(derecho) AS derecho, trim(izquierdo) AS izquierdo, "
+                "trim(det_derecho) AS det_derecho, trim(det_izquierdo) AS det_izquierdo, "
+                "trim(detalle) AS detalle "
+                "FROM v_clinical_entries_espect "
+                "WHERE id_entries = ANY(:ids) ORDER BY id_hc_medida"
             ),
             {"ids": entry_ids},
         ).mappings()

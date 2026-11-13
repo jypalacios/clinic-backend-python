@@ -2,6 +2,8 @@
 
 Aplicación de backend para la gestión clínica, desarrollada con FastAPI, SQLAlchemy y PostgreSQL.
 
+Las medidas disponibles en las historias clínicas corresponden a la especialidad del médico autenticado (`cli_hc_general.id_espect`). En neurología se registra un detalle de hasta 255 caracteres por medida en lugar de valores por ojo; las demás especialidades conservan los campos oculares. Las notas se consultan mediante `v_clinical_entries` y las medidas mediante `v_clinical_entries_espect`. Ambas vistas y la versión de 20 parámetros de `sp_insertar_clinical_entry` deben existir en la base de datos según `03_vistas.sql` y `02_procedimientos.sql`; al actualizar el procedimiento, su auditoría no debe incluir contenido clínico. La configuración del tipo de consulta debe corresponder a la especialidad del médico.
+
 ## Arquitectura general
 
 ┌──────────────┐     HTTP/JSON     ┌────────────────┐     SQLAlchemy     ┌──────────────┐
