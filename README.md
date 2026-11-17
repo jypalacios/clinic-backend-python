@@ -118,6 +118,11 @@ tener la extensión instalada, `pg_cron` habilitado en `shared_preload_libraries
 - `POST /api/v1/analysis/assignments` y `PUT /api/v1/analysis/assignments/{id}` requieren `analysis.manage`. El usuario autenticado se registra como creador o modificador.
 - Requiere las vistas `v_cli_tipo_appointment` y `v_cli_hc_appointment`, las tablas de detalle de historia clínica y los procedimientos `sp_crear_cli_hc_appointment` y `sp_actualizar_cli_hc_appointment` instalados en PostgreSQL. Los permisos se asignan inicialmente al rol `ADMINISTRADOR`.
 
+### Antecedentes
+- Management permite consultar categorías y administrar subantecedentes por especialidad.
+- `GET /api/v1/antecedents`, `/specialties` y `/items` requieren `antecedents.view`; `POST /api/v1/antecedents/items` y `PUT /api/v1/antecedents/items/{id}` requieren `antecedents.manage`.
+- PostgreSQL debe tener instalados `v_cli_antecedentes`, las tablas `cli_sub_antecedentes` y `espect`, y los procedimientos `sp_crear_cli_sub_antecedentes` y `sp_actualizar_cli_sub_antecedentes` de los scripts SQL. Los permisos se asignan inicialmente al rol `ADMINISTRADOR`; pueden asignarse a otros roles en Roles y permisos.
+
 ### Autenticación
 - login con email y contraseña
 - generación de token JWT
