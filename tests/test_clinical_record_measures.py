@@ -114,6 +114,7 @@ class ClinicalRecordMeasureTests(unittest.TestCase):
         service.repo.entries_by_id.return_value = {1: entry_data}
         service.repo.diagnoses_by_entry.return_value = {}
         service.repo.measures_by_entry.return_value = {}
+        service.repo.antecedents_by_entry.return_value = {}
         patient = SimpleNamespace(id_patients=4, ced_patients="123", nom_patients="A", ape_patients="B",
                                   edad=30, sexo=SimpleNamespace(nom_sexo="F"))
         doctor = SimpleNamespace(id_doctors=3, nom_doctors="C", ape_doctors="D")

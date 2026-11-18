@@ -4,6 +4,8 @@ Aplicación de backend para la gestión clínica, desarrollada con FastAPI, SQLA
 
 Las medidas disponibles en las historias clínicas corresponden a la especialidad del médico autenticado (`cli_hc_general.id_espect`). En neurología se registra un detalle de hasta 255 caracteres por medida en lugar de valores por ojo; las demás especialidades conservan los campos oculares. Las notas se consultan mediante `v_clinical_entries` y las medidas mediante `v_clinical_entries_espect`. Ambas vistas y la versión de 20 parámetros de `sp_insertar_clinical_entry` deben existir en la base de datos según `03_vistas.sql` y `02_procedimientos.sql`; al actualizar el procedimiento, su auditoría no debe incluir contenido clínico. La configuración del tipo de consulta debe corresponder a la especialidad del médico.
 
+En la consulta, los antecedentes disponibles se filtran por `v_appointments.id_espect` de la cita seleccionada. Los antecedentes marcados se guardan con la nota mediante `sp_crear_cli_entries_antecedentes` y se leen desde `cli_entries_antecedentes`. Al rectificar se crean registros para la nueva nota, sin modificar los originales. La base de datos debe tener instalado el procedimiento correspondiente.
+
 ## Arquitectura general
 
 ┌──────────────┐     HTTP/JSON     ┌────────────────┐     SQLAlchemy     ┌──────────────┐
