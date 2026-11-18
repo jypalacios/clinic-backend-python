@@ -156,6 +156,57 @@ class ClinicalRecordRepository:
     def get_entry(self, entry_id: int) -> ClinicalEntry | None:
         return self.db.get(ClinicalEntry, entry_id)
 
+    def appointment_specialty(self, appointment_id: int, doctor_id: int) -> dict | None:
+        row = self.db.execute(text(
+            "SELECT id_patients, id_espect, nom_estado FROM public.v_appointments "
+            "WHERE id_appointments = :appointment AND id_doctors = :doctor"
+        ), {"appointment": appointment_id, "doctor": doctor_id}).mappings().one_or_none()
+        return dict(row) if row is not None else None
+
+    def list_antecedent_types(self, specialty_id: int) -> list[dict]:
+        return [dict(row) for row in self.db.execute(text(
+            "SELECT s.id_sub_antecedente, s.id_cli_antecedente, "
+            "trim(s.det_sub_antecedente) AS det_sub_antecedente, "
+            "trim(a.det_cli_antecedente) AS det_cli_antecedente "
+            "FROM public.cli_sub_antecedentes s "
+            "JOIN public.cli_antecedentes a ON a.id_cli_antecedente = s.id_cli_antecedente "
+            "WHERE s.id_espect = :specialty "
+            "ORDER BY a.det_cli_antecedente, s.det_sub_antecedente, s.id_sub_antecedente"
+        ), {"specialty": specialty_id}).mappings()]
+
+    def antecedents_by_entry(self, entry_ids: list[int]) -> dict[int, list[dict]]:
+        if not entry_ids:
+            return {}
+        rows = self.db.execute(text(
+            "SELECT e.id_entries, e.id_cli_entries_antecedente, e.id_cli_antecedente, "
+            "e.id_sub_antecedente, trim(a.det_cli_antecedente) AS det_cli_antecedente, "
+            "trim(s.det_sub_antecedente) AS det_sub_antecedente, e.medida_cli_antecedente, e.checked "
+            "FROM public.cli_entries_antecedentes e "
+            "JOIN public.cli_antecedentes a ON a.id_cli_antecedente = e.id_cli_antecedente "
+            "JOIN public.cli_sub_antecedentes s ON s.id_sub_antecedente = e.id_sub_antecedente "
+            "WHERE e.id_entries = ANY(:ids) ORDER BY e.id_cli_entries_antecedente"
+        ), {"ids": entry_ids}).mappings()
+        result: dict[int, list[dict]] = {}
+        for row in rows:
+            result.setdefault(row["id_entries"], []).append(
+                {key: value for key, value in row.items() if key != "id_entries"}
+            )
+        return result
+
+    def assign_antecedents(self, entry_id: int, items: list[dict], user_id: int) -> None:
+        for item in items:
+            self.db.execute(text(
+                "CALL public.sp_crear_cli_entries_antecedentes("
+                ":entry, :antecedent, :sub_antecedent, :value, :checked, :user_id)"
+            ), {
+                "entry": entry_id,
+                "antecedent": item["id_cli_antecedente"],
+                "sub_antecedent": item["id_sub_antecedente"],
+                "value": item["medida_cli_antecedente"],
+                "checked": True,
+                "user_id": user_id,
+            })
+
     def insert_entry(self, record_id: int, doctor_id: int, rectifies: int | None, data: dict, user_id: int) -> int:
         measures = [
             m for m in data.get("medidas") or []

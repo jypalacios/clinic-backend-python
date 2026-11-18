@@ -63,6 +63,17 @@ def get_measure_config(
     return ClinicalRecordService(db).measure_config(current_user)
 
 
+@router.get("/appointments/{appointment_id}/antecedents")
+def list_appointment_antecedents(
+    appointment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_any_permission("medical_history.view", "consultations.view")
+    ),
+):
+    return ClinicalRecordService(db).appointment_antecedents(appointment_id, current_user)
+
+
 @router.get("/patients/{patient_id}/cups")
 def list_patient_cups(
     patient_id: int,

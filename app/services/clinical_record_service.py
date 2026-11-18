@@ -52,6 +52,7 @@ class ClinicalRecordService:
             raise ValueError("La historia está archivada; solicite al administrador que la restaure")
 
         self._validate_measures(data, doctor)
+        antecedents = self._validate_antecedents(data, doctor, data.id_patients)
         record = ClinicalRecord(id_patients=data.id_patients, id_doctors=doctor.id_doctors)
         try:
             self.repo.add(record)
@@ -64,6 +65,7 @@ class ClinicalRecordService:
                 user.id,
             )
             self._assign_diagnoses(data.id_diags, entry_id_new, user.id)
+            self.repo.assign_antecedents(entry_id_new, antecedents, user.id)
             self._assign_cups(data.id_cups, data.id_patients, user.id)
             self._audit(user.id, "CREATE_CLINICAL_RECORD", {"id_clinic": record.id_clinic})
             self.repo.commit()
@@ -92,6 +94,7 @@ class ClinicalRecordService:
                 raise ValueError("La nota que intenta rectificar no pertenece a esta historia")
 
         self._validate_measures(data, doctor)
+        antecedents = self._validate_antecedents(data, doctor, record.id_patients)
         try:
             new_entry_id = self.repo.insert_entry(
                 record_id,
@@ -101,6 +104,7 @@ class ClinicalRecordService:
                 user.id,
             )
             self._assign_diagnoses(data.id_diags, new_entry_id, user.id)
+            self.repo.assign_antecedents(new_entry_id, antecedents, user.id)
             self._assign_cups(data.id_cups, record.id_patients, user.id)
             self._audit(
                 user.id,
@@ -144,6 +148,36 @@ class ClinicalRecordService:
 
     def list_measure_types(self, user: User) -> list[dict[str, Any]]:
         return self.repo.list_measure_types(self._current_doctor(user).id_espect)
+
+    def appointment_antecedents(self, appointment_id: int, user: User) -> list[dict[str, Any]]:
+        doctor = self._current_doctor(user)
+        appointment = self.repo.appointment_specialty(appointment_id, doctor.id_doctors)
+        if appointment is None or appointment["nom_estado"] in {"CANCELADA", "NO_ASISTIO"}:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no disponible")
+        return self.repo.list_antecedent_types(appointment["id_espect"])
+
+    def _validate_antecedents(
+        self, data: ClinicalEntryCreate, doctor: Doctor, patient_id: int
+    ) -> list[dict[str, Any]]:
+        if not data.antecedentes:
+            return []
+        if data.id_appointment is None:
+            raise ValueError("Seleccione la cita para registrar antecedentes")
+        appointment = self.repo.appointment_specialty(data.id_appointment, doctor.id_doctors)
+        if (
+            appointment is None
+            or appointment["id_patients"] != patient_id
+            or appointment["nom_estado"] not in {"PROGRAMADA", "CONFIRMADA", "EN SALA DE ESPERA"}
+        ):
+            raise ValueError("La cita no corresponde al paciente o no está programada")
+        catalog = {item["id_sub_antecedente"]: item for item in self.repo.list_antecedent_types(appointment["id_espect"])}
+        ids = [item.id_sub_antecedente for item in data.antecedentes]
+        if len(set(ids)) != len(ids) or any(item_id not in catalog for item_id in ids):
+            raise ValueError("Los antecedentes deben ser únicos y corresponder a la especialidad de la cita")
+        return [
+            {**catalog[item.id_sub_antecedente], "medida_cli_antecedente": item.medida_cli_antecedente.strip()}
+            for item in data.antecedentes
+        ]
 
     @staticmethod
     def _measure_mode(specialty_name: str) -> str:
@@ -245,6 +279,7 @@ class ClinicalRecordService:
             entry_data = self.repo.entries_by_id(entry_ids)
             diagnoses = self.repo.diagnoses_by_entry(entry_ids)
             measures = self.repo.measures_by_entry(entry_ids)
+            antecedents = self.repo.antecedents_by_entry(entry_ids)
             for entry in record.entries:
                 if entry.id_entries not in entry_data:
                     raise RuntimeError(f"La nota clínica {entry.id_entries} no se encuentra en v_clinical_entries")
@@ -253,6 +288,7 @@ class ClinicalRecordService:
                     "measure_mode": self._measure_mode(entry_data[entry.id_entries]["nom_espect"]),
                     "medidas": measures.get(entry.id_entries, []),
                     "diagnosticos": diagnoses.get(entry.id_entries, []),
+                    "antecedentes": antecedents.get(entry.id_entries, []),
                 })
         return {
             "id_clinic": record.id_clinic,
