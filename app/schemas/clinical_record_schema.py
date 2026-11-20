@@ -32,6 +32,21 @@ class ClinicalAntecedentOut(ClinicalAntecedentIn):
     checked: bool
 
 
+class ClinicalRevisionSystemIn(BaseModel):
+    id_revision_sistema: int = Field(gt=0)
+    checked: bool
+    medida_revision: str = Field(default="", max_length=255)
+
+
+class ClinicalRevisionSystemOut(ClinicalRevisionSystemIn):
+    det_revision_sistemas: str
+
+
+class ClinicalRevisionSystemTypeOut(BaseModel):
+    id_revision_sistema: int
+    det_revision_sistemas: str
+
+
 class ClinicalEntryCreate(BaseModel):
     motivo_consulta: str = Field(min_length=1, max_length=10000)
     examen_fisico: str | None = Field(default=None, max_length=20000)
@@ -46,6 +61,7 @@ class ClinicalEntryCreate(BaseModel):
     medidas: list[ClinicalMeasureIn] = Field(default_factory=list)
     id_appointment: int | None = Field(default=None, gt=0)
     antecedentes: list[ClinicalAntecedentIn] = Field(default_factory=list)
+    revision_sistemas: list[ClinicalRevisionSystemIn] = Field(default_factory=list)
 
 class ClinicalEntryCorrection(ClinicalEntryCreate):
     id_entries_rectifica: int
@@ -98,6 +114,7 @@ class ClinicalEntryOut(BaseModel):
     measure_mode: Literal["detalle", "ojos"]
     diagnosticos: list[ClinicalEntryDiagnosisOut] = Field(default_factory=list)
     antecedentes: list[ClinicalAntecedentOut] = Field(default_factory=list)
+    revision_sistemas: list[ClinicalRevisionSystemOut] = Field(default_factory=list)
 
 class ClinicalRecordOut(BaseModel):
     id_clinic: int

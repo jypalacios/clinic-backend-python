@@ -4,7 +4,12 @@ from sqlalchemy.orm import Session
 from app.core.deps import require_any_permission, require_permissions, require_roles
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.clinical_record_schema import ClinicalEntryCreate, ClinicalRecordCreate, ClinicalRecordOut
+from app.schemas.clinical_record_schema import (
+    ClinicalEntryCreate,
+    ClinicalRecordCreate,
+    ClinicalRecordOut,
+    ClinicalRevisionSystemTypeOut,
+)
 from app.services.clinical_record_service import ClinicalRecordService
 
 router = APIRouter(prefix="/clinical-records", tags=["clinical-records"])
@@ -61,6 +66,16 @@ def get_measure_config(
     ),
 ):
     return ClinicalRecordService(db).measure_config(current_user)
+
+
+@router.get("/revision-sistemas", response_model=list[ClinicalRevisionSystemTypeOut])
+def list_revision_system_types(
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(
+        require_any_permission("medical_history.manage", "consultations.create", "consultations.edit")
+    ),
+):
+    return ClinicalRecordService(db).list_revision_system_types()
 
 
 @router.get("/appointments/{appointment_id}/antecedents")

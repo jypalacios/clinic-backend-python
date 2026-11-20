@@ -207,6 +207,44 @@ class ClinicalRecordRepository:
                 "user_id": user_id,
             })
 
+    def list_revision_system_types(self) -> list[dict]:
+        return [
+            dict(row)
+            for row in self.db.execute(text(
+                "SELECT id_revision_sistema, det_revision_sistemas "
+                "FROM public.v_cli_revision_sistemas "
+                "ORDER BY det_revision_sistemas, id_revision_sistema"
+            )).mappings()
+        ]
+
+    def revision_systems_by_entry(self, entry_ids: list[int]) -> dict[int, list[dict]]:
+        if not entry_ids:
+            return {}
+        rows = self.db.execute(text(
+            "SELECT id_entries, id_revision_sistema, det_revision_sistemas, checked, medida_revision "
+            "FROM public.v_cli_entries_revision "
+            "WHERE id_entries = ANY(:ids) ORDER BY id_entries, id_revision_sistema"
+        ), {"ids": entry_ids}).mappings()
+        result: dict[int, list[dict]] = {}
+        for row in rows:
+            result.setdefault(row["id_entries"], []).append({
+                key: value for key, value in row.items() if key != "id_entries"
+            })
+        return result
+
+    def assign_revision_systems(self, entry_id: int, items: list[dict], user_id: int) -> None:
+        for item in items:
+            self.db.execute(text(
+                "CALL public.sp_crear_cli_entries_revision("
+                ":entry, :revision_system, :checked, :value, :user_id)"
+            ), {
+                "entry": entry_id,
+                "revision_system": item["id_revision_sistema"],
+                "checked": item["checked"],
+                "value": item["medida_revision"],
+                "user_id": user_id,
+            })
+
     def insert_entry(self, record_id: int, doctor_id: int, rectifies: int | None, data: dict, user_id: int) -> int:
         measures = [
             m for m in data.get("medidas") or []
