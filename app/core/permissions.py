@@ -36,6 +36,8 @@ Permission = Literal[
     "analysis.manage",
     "antecedents.view",
     "antecedents.manage",
+    "revision_systems.view",
+    "revision_systems.manage",
 ]
 
 LEGACY_PERMISSION_KEYS: dict[str, str] = {

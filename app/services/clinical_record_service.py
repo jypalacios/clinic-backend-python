@@ -53,6 +53,7 @@ class ClinicalRecordService:
 
         self._validate_measures(data, doctor)
         antecedents = self._validate_antecedents(data, doctor, data.id_patients)
+        revision_systems = self._validate_revision_systems(data)
         record = ClinicalRecord(id_patients=data.id_patients, id_doctors=doctor.id_doctors)
         try:
             self.repo.add(record)
@@ -66,6 +67,7 @@ class ClinicalRecordService:
             )
             self._assign_diagnoses(data.id_diags, entry_id_new, user.id)
             self.repo.assign_antecedents(entry_id_new, antecedents, user.id)
+            self.repo.assign_revision_systems(entry_id_new, revision_systems, user.id)
             self._assign_cups(data.id_cups, data.id_patients, user.id)
             self._audit(user.id, "CREATE_CLINICAL_RECORD", {"id_clinic": record.id_clinic})
             self.repo.commit()
@@ -95,6 +97,7 @@ class ClinicalRecordService:
 
         self._validate_measures(data, doctor)
         antecedents = self._validate_antecedents(data, doctor, record.id_patients)
+        revision_systems = self._validate_revision_systems(data)
         try:
             new_entry_id = self.repo.insert_entry(
                 record_id,
@@ -105,6 +108,7 @@ class ClinicalRecordService:
             )
             self._assign_diagnoses(data.id_diags, new_entry_id, user.id)
             self.repo.assign_antecedents(new_entry_id, antecedents, user.id)
+            self.repo.assign_revision_systems(new_entry_id, revision_systems, user.id)
             self._assign_cups(data.id_cups, record.id_patients, user.id)
             self._audit(
                 user.id,
@@ -149,6 +153,9 @@ class ClinicalRecordService:
     def list_measure_types(self, user: User) -> list[dict[str, Any]]:
         return self.repo.list_measure_types(self._current_doctor(user).id_espect)
 
+    def list_revision_system_types(self) -> list[dict[str, Any]]:
+        return self.repo.list_revision_system_types()
+
     def appointment_antecedents(self, appointment_id: int, user: User) -> list[dict[str, Any]]:
         doctor = self._current_doctor(user)
         appointment = self.repo.appointment_specialty(appointment_id, doctor.id_doctors)
@@ -177,6 +184,25 @@ class ClinicalRecordService:
         return [
             {**catalog[item.id_sub_antecedente], "medida_cli_antecedente": item.medida_cli_antecedente.strip()}
             for item in data.antecedentes
+        ]
+
+    def _validate_revision_systems(self, data: ClinicalEntryCreate) -> list[dict[str, Any]]:
+        if not data.revision_sistemas:
+            return []
+        catalog = {
+            item["id_revision_sistema"]: item
+            for item in self.repo.list_revision_system_types()
+        }
+        ids = [item.id_revision_sistema for item in data.revision_sistemas]
+        if len(set(ids)) != len(ids) or any(item_id not in catalog for item_id in ids):
+            raise ValueError("Los ítems de revisión por sistemas deben ser únicos y válidos")
+        return [
+            {
+                "id_revision_sistema": item.id_revision_sistema,
+                "checked": item.checked,
+                "medida_revision": item.medida_revision.strip() if item.checked else "",
+            }
+            for item in data.revision_sistemas
         ]
 
     @staticmethod
@@ -280,6 +306,7 @@ class ClinicalRecordService:
             diagnoses = self.repo.diagnoses_by_entry(entry_ids)
             measures = self.repo.measures_by_entry(entry_ids)
             antecedents = self.repo.antecedents_by_entry(entry_ids)
+            revision_systems = self.repo.revision_systems_by_entry(entry_ids)
             for entry in record.entries:
                 if entry.id_entries not in entry_data:
                     raise RuntimeError(f"La nota clínica {entry.id_entries} no se encuentra en v_clinical_entries")
@@ -289,6 +316,7 @@ class ClinicalRecordService:
                     "medidas": measures.get(entry.id_entries, []),
                     "diagnosticos": diagnoses.get(entry.id_entries, []),
                     "antecedentes": antecedents.get(entry.id_entries, []),
+                    "revision_sistemas": revision_systems.get(entry.id_entries, []),
                 })
         return {
             "id_clinic": record.id_clinic,
